@@ -149,6 +149,49 @@ func (c *Client) GetFormDetail(ctx context.Context, formID int) (*FormDetailResp
 	return &out, nil
 }
 
+// SystemForm is an entry in the admin-side form list (GET /api/v1/system/forms).
+// It carries extra fields (page_count, table_name, tsffile_name) compared to
+// the user-facing form list.
+type SystemForm struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Code        string `json:"code"`
+	PageCount   int    `json:"page_count"`
+	TableName   string `json:"table_name"`
+	TsfFileName string `json:"tsffile_name"`
+}
+
+type SystemFormGroup struct {
+	ID        string       `json:"id"`
+	Name      string       `json:"name"`
+	FormCount int          `json:"form_count"`
+	Form      []SystemForm `json:"form"`
+}
+
+type SystemFormsListResponse struct {
+	FormGroup []SystemFormGroup `json:"form_group"`
+}
+
+// ListSystemForms calls GET /api/v1/system/forms (admin: 登録フォーム一覧取得).
+func (c *Client) ListSystemForms(ctx context.Context) (*SystemFormsListResponse, error) {
+	var out SystemFormsListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/system/forms", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetSystemFormDetail calls GET /api/v1/system/forms/{fid} (admin) and returns
+// the same shape as GetFormDetail.
+func (c *Client) GetSystemFormDetail(ctx context.Context, formID int) (*FormDetailResponse, error) {
+	path := fmt.Sprintf("/api/v1/system/forms/%d", formID)
+	var out FormDetailResponse
+	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 type Approval struct {
 	DocID            int      `json:"docid"`
 	Hidden           *bool    `json:"hidden,omitempty"`
