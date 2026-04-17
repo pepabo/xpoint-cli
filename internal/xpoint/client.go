@@ -530,6 +530,24 @@ func (c *Client) GetQuery(ctx context.Context, queryCode string, p GetQueryParam
 	return out, nil
 }
 
+// GetQueryGraph calls GET /api/v1/query/graph/{query_code} and returns the
+// image bytes and the server-provided filename (from Content-Disposition).
+// outFormat must be "png" or "jpeg" (empty string defaults to png on the
+// server).
+func (c *Client) GetQueryGraph(ctx context.Context, queryCode, outFormat string) (string, []byte, error) {
+	path := fmt.Sprintf("/api/v1/query/graph/%s", url.PathEscape(queryCode))
+	var q url.Values
+	if outFormat != "" {
+		q = url.Values{}
+		q.Set("outFormat", outFormat)
+	}
+	accept := "image/png"
+	if outFormat == "jpeg" {
+		accept = "image/jpeg"
+	}
+	return c.downloadBytes(ctx, http.MethodGet, path, q, nil, "", accept)
+}
+
 type AddCommentRequest struct {
 	Content      string `json:"content"`
 	AttentionFlg int    `json:"attentionflg"`
