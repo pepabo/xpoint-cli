@@ -7,7 +7,15 @@ import (
 
 func TestAliases_Sorted(t *testing.T) {
 	got := Aliases()
-	want := []string{"approval.list", "document.create", "document.search", "form.list"}
+	want := []string{
+		"approval.list",
+		"document.create",
+		"document.delete",
+		"document.get",
+		"document.search",
+		"document.update",
+		"form.list",
+	}
 	if len(got) != len(want) {
 		t.Fatalf("aliases = %v", got)
 	}
@@ -82,6 +90,51 @@ func TestLookup_ApprovalList_RequiredStat(t *testing.T) {
 	first, _ := params[0].(map[string]any)
 	if first["name"] != "stat" || first["required"] != true {
 		t.Errorf("first param = %v", first)
+	}
+}
+
+func TestLookup_DocumentGet(t *testing.T) {
+	op, err := Lookup("document.get")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "GET" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/documents/{docid}" {
+		t.Errorf("path = %v", op["path"])
+	}
+}
+
+func TestLookup_DocumentUpdate(t *testing.T) {
+	op, err := Lookup("document.update")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "PATCH" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/documents/{docid}" {
+		t.Errorf("path = %v", op["path"])
+	}
+	body, _ := op["requestBody"].(map[string]any)
+	props, _ := body["properties"].(map[string]any)
+	rc, _ := props["route_code"].(map[string]any)
+	if rc["required"] != true {
+		t.Errorf("route_code.required = %v", rc["required"])
+	}
+}
+
+func TestLookup_DocumentDelete(t *testing.T) {
+	op, err := Lookup("document.delete")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "DELETE" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/documents/{docid}" {
+		t.Errorf("path = %v", op["path"])
 	}
 }
 

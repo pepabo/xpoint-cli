@@ -80,6 +80,56 @@ func TestRunDocumentCreate_RequiresBody(t *testing.T) {
 	}
 }
 
+func TestParseDocID(t *testing.T) {
+	cases := []struct {
+		in      string
+		want    int
+		wantErr bool
+	}{
+		{"1", 1, false},
+		{"999", 999, false},
+		{"  42  ", 42, false},
+		{"0", 0, true},
+		{"-3", 0, true},
+		{"abc", 0, true},
+		{"", 0, true},
+	}
+	for _, c := range cases {
+		got, err := parseDocID(c.in)
+		if c.wantErr {
+			if err == nil {
+				t.Errorf("parseDocID(%q) = %d, want error", c.in, got)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("parseDocID(%q) err = %v", c.in, err)
+		}
+		if got != c.want {
+			t.Errorf("parseDocID(%q) = %d, want %d", c.in, got, c.want)
+		}
+	}
+}
+
+func TestRunDocumentEdit_RequiresBody(t *testing.T) {
+	docEditBody = ""
+	t.Setenv("XPOINT_SUBDOMAIN", "acme")
+	t.Setenv("XPOINT_API_ACCESS_TOKEN", "tok")
+	t.Setenv("XPOINT_GENERIC_API_TOKEN", "")
+
+	err := runDocumentEdit(documentEditCmd, []string{"999"})
+	if err == nil || !strings.Contains(err.Error(), "--body is required") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestRunDocumentEdit_InvalidDocID(t *testing.T) {
+	err := runDocumentEdit(documentEditCmd, []string{"not-a-number"})
+	if err == nil || !strings.Contains(err.Error(), "invalid docid") {
+		t.Errorf("err = %v", err)
+	}
+}
+
 func TestLoadSearchBody_Stdin(t *testing.T) {
 	orig := os.Stdin
 	t.Cleanup(func() { os.Stdin = orig })

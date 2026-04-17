@@ -1,0 +1,28 @@
+{
+  "method": "DELETE",
+  "path": "/api/v1/documents/{docid}",
+  "summary": "書類削除",
+  "description": "指定された ID の書類を削除する。削除権限が必要。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "message_type": {
+        "type": "integer",
+        "description": "メッセージタイプ"
+      },
+      "message": {
+        "type": "string",
+        "description": "メッセージ内容"
+      }
+    }
+  }
+}
