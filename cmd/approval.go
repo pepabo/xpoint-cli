@@ -54,7 +54,7 @@ func init() {
 }
 
 func runApprovalList(cmd *cobra.Command, args []string) error {
-	client, err := newClientFromFlags()
+	client, err := newClientFromFlags(cmd.Context())
 	if err != nil {
 		return err
 	}

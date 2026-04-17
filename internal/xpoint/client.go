@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 )
@@ -28,6 +29,15 @@ type Auth struct {
 
 	// OAuth2 access token: sent as Authorization: Bearer.
 	AccessToken string
+}
+
+// redactToken returns a partial preview of a credential for debug output:
+// first and last few chars only.
+func redactToken(s string) string {
+	if len(s) <= 8 {
+		return "***"
+	}
+	return s[:4] + "***" + s[len(s)-4:]
 }
 
 func (a Auth) apply(req *http.Request) {
@@ -241,6 +251,21 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	debug := os.Getenv("XP_DEBUG") != ""
+	if debug {
+		fmt.Fprintf(os.Stderr, "[xp] %s %s\n", req.Method, u)
+		for k, v := range req.Header {
+			val := v[0]
+			if k == "Authorization" {
+				val = "Bearer " + redactToken(val[len("Bearer "):])
+			}
+			if k == "X-ATLED-Generic-API-Token" {
+				val = redactToken(val)
+			}
+			fmt.Fprintf(os.Stderr, "[xp]   %s: %s\n", k, val)
+		}
+	}
+
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
@@ -250,6 +275,10 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read response body: %w", err)
+	}
+	if debug {
+		fmt.Fprintf(os.Stderr, "[xp] <- %s (%d bytes)\n", resp.Status, len(respBody))
+		fmt.Fprintf(os.Stderr, "[xp]    %s\n", string(respBody))
 	}
 	if resp.StatusCode/100 != 2 {
 		return fmt.Errorf("xpoint api error: %s: %s", resp.Status, string(respBody))
