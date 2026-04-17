@@ -26,6 +26,10 @@ Supported aliases map to the CLI's commands:
   document.delete   DELETE /api/v1/documents/{docid}
   document.download GET    /api/v1/documents/{docid}/pdf
   document.status   GET    /api/v1/documents/{docid}/status
+  document.comment.add    POST   /api/v1/documents/{docid}/comments
+  document.comment.get    GET    /api/v1/documents/{docid}/comments
+  document.comment.edit   PATCH  /api/v1/documents/{docid}/comments/{seq}
+  document.comment.delete DELETE /api/v1/documents/{docid}/comments/{seq}
   query.list        GET    /api/v1/query/
   query.exec        GET    /api/v1/query/{query_code}
 

@@ -124,6 +124,18 @@ xp document open 266248              # 既定のブラウザで書類を開く
 xp document open 266248 --no-browser # URLだけ出力（ブラウザは起動しない）
 ```
 
+### ドキュメントのコメント操作
+
+```sh
+xp document comment get 266248                              # コメント一覧
+xp document comment add 266248 --content "承認お願いします"  # コメント追加
+xp document comment add 266248 --content "重要" --attention  # 重要コメント
+xp document comment edit 266248 2 --content "修正後"         # 内容を更新
+xp document comment edit 266248 2 --attention 1              # 重要フラグだけ更新
+xp document comment delete 266248 2                          # コメント削除（確認あり）
+xp document comment delete 266248 2 -y                       # 確認なしで削除
+```
+
 ### ドキュメントのPDFダウンロード
 
 ```sh

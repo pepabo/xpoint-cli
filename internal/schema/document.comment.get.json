@@ -1,0 +1,53 @@
+{
+  "method": "GET",
+  "path": "/api/v1/documents/{docid}/comments",
+  "summary": "コメント取得",
+  "description": "指定された書類 ID に登録されているコメントを一括で取得する。閲覧権限が必要。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "docid": {
+        "type": "integer",
+        "description": "書類ID"
+      },
+      "comment_list": {
+        "type": "array",
+        "description": "コメント一覧",
+        "items": {
+          "type": "object",
+          "properties": {
+            "seqno": {
+              "type": "string",
+              "description": "コメント番号"
+            },
+            "attentionflg": {
+              "type": "boolean",
+              "description": "重要コメントフラグ (true: 重要 / false: 通常)"
+            },
+            "content": {
+              "type": "string",
+              "description": "コメント内容"
+            },
+            "writername": {
+              "type": "string",
+              "description": "コメント登録者名"
+            },
+            "writedate": {
+              "type": "string",
+              "description": "コメント登録日時"
+            }
+          }
+        }
+      }
+    }
+  }
+}

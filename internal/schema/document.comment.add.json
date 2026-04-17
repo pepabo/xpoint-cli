@@ -1,0 +1,52 @@
+{
+  "method": "POST",
+  "path": "/api/v1/documents/{docid}/comments",
+  "summary": "コメント追加",
+  "description": "指定された書類 ID にコメントを追加する。更新権限が必要。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    }
+  ],
+  "requestBody": {
+    "contentType": "application/json",
+    "description": "コメント追加リクエスト。required: content, attentionflg。\n",
+    "properties": {
+      "content": {
+        "type": "string",
+        "required": true,
+        "description": "コメント内容"
+      },
+      "attentionflg": {
+        "type": "integer",
+        "required": true,
+        "description": "重要コメントフラグ (0: 通常 / 1: 重要)"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "docid": {
+        "type": "integer",
+        "description": "書類ID"
+      },
+      "seq": {
+        "type": "integer",
+        "description": "コメント番号"
+      },
+      "message_type": {
+        "type": "integer",
+        "description": "メッセージタイプ (3: INFO 固定)"
+      },
+      "message": {
+        "type": "string",
+        "description": "メッセージ内容"
+      }
+    }
+  }
+}

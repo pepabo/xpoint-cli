@@ -9,6 +9,10 @@ func TestAliases_Sorted(t *testing.T) {
 	got := Aliases()
 	want := []string{
 		"approval.list",
+		"document.comment.add",
+		"document.comment.delete",
+		"document.comment.edit",
+		"document.comment.get",
 		"document.create",
 		"document.delete",
 		"document.download",
@@ -233,6 +237,68 @@ func TestLookup_FormShow(t *testing.T) {
 	first, _ := params[0].(map[string]any)
 	if first["name"] != "fid" || first["required"] != true || first["type"] != "integer" {
 		t.Errorf("fid param = %v", first)
+	}
+}
+
+func TestLookup_DocumentCommentAdd(t *testing.T) {
+	op, err := Lookup("document.comment.add")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "POST" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/documents/{docid}/comments" {
+		t.Errorf("path = %v", op["path"])
+	}
+	body, _ := op["requestBody"].(map[string]any)
+	props, _ := body["properties"].(map[string]any)
+	content, _ := props["content"].(map[string]any)
+	if content["required"] != true {
+		t.Errorf("content.required = %v", content["required"])
+	}
+}
+
+func TestLookup_DocumentCommentGet(t *testing.T) {
+	op, err := Lookup("document.comment.get")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "GET" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/documents/{docid}/comments" {
+		t.Errorf("path = %v", op["path"])
+	}
+}
+
+func TestLookup_DocumentCommentEdit(t *testing.T) {
+	op, err := Lookup("document.comment.edit")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "PATCH" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/documents/{docid}/comments/{seq}" {
+		t.Errorf("path = %v", op["path"])
+	}
+	params, _ := op["parameters"].([]any)
+	if len(params) != 2 {
+		t.Fatalf("parameters = %v", params)
+	}
+}
+
+func TestLookup_DocumentCommentDelete(t *testing.T) {
+	op, err := Lookup("document.comment.delete")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "DELETE" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/documents/{docid}/comments/{seq}" {
+		t.Errorf("path = %v", op["path"])
 	}
 }
 

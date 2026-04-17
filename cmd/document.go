@@ -43,6 +43,20 @@ var (
 	docStatusJQ      string
 
 	docOpenNoBrowser bool
+
+	docCommentAddContent    string
+	docCommentAddAttention  bool
+	docCommentAddOutput     string
+	docCommentAddJQ         string
+	docCommentGetOutput     string
+	docCommentGetJQ         string
+	docCommentEditContent   string
+	docCommentEditAttention string
+	docCommentEditOutput    string
+	docCommentEditJQ        string
+	docCommentDeleteYes     bool
+	docCommentDeleteOutput  string
+	docCommentDeleteJQ      string
 )
 
 var documentCmd = &cobra.Command{
@@ -140,6 +154,51 @@ Pass --no-browser (or -n) to print the URL without launching the browser.`,
 	RunE: runDocumentOpen,
 }
 
+var documentCommentCmd = &cobra.Command{
+	Use:   "comment",
+	Short: "Manage document comments",
+}
+
+var documentCommentAddCmd = &cobra.Command{
+	Use:   "add <docid>",
+	Short: "Add a comment to a document",
+	Long: `Add a comment to a document via POST /api/v1/documents/{docid}/comments.
+
+The comment body is provided with --content (required). Pass --attention
+to mark the comment as important.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentCommentAdd,
+}
+
+var documentCommentGetCmd = &cobra.Command{
+	Use:   "get <docid>",
+	Short: "Get comments on a document",
+	Long:  `List comments on a document via GET /api/v1/documents/{docid}/comments.`,
+	Args:  cobra.ExactArgs(1),
+	RunE:  runDocumentCommentGet,
+}
+
+var documentCommentEditCmd = &cobra.Command{
+	Use:   "edit <docid> <seq>",
+	Short: "Update a comment",
+	Long: `Update a comment via PATCH /api/v1/documents/{docid}/comments/{seq}.
+
+At least one of --content / --attention must be provided. --attention accepts
+"0" (normal) or "1" (important); omit to leave unchanged.`,
+	Args: cobra.ExactArgs(2),
+	RunE: runDocumentCommentEdit,
+}
+
+var documentCommentDeleteCmd = &cobra.Command{
+	Use:   "delete <docid> <seq>",
+	Short: "Delete a comment",
+	Long: `Delete a comment via DELETE /api/v1/documents/{docid}/comments/{seq}.
+
+By default the command prompts for confirmation. Pass --yes to skip it.`,
+	Args: cobra.ExactArgs(2),
+	RunE: runDocumentCommentDelete,
+}
+
 var documentDownloadCmd = &cobra.Command{
 	Use:   "download <docid>",
 	Short: "Download a document as PDF",
@@ -164,6 +223,11 @@ func init() {
 	documentCmd.AddCommand(documentStatusCmd)
 	documentCmd.AddCommand(documentDownloadCmd)
 	documentCmd.AddCommand(documentOpenCmd)
+	documentCmd.AddCommand(documentCommentCmd)
+	documentCommentCmd.AddCommand(documentCommentAddCmd)
+	documentCommentCmd.AddCommand(documentCommentGetCmd)
+	documentCommentCmd.AddCommand(documentCommentEditCmd)
+	documentCommentCmd.AddCommand(documentCommentDeleteCmd)
 
 	f := documentSearchCmd.Flags()
 	f.StringVar(&docSearchBody, "body", "", "search condition JSON: inline, file path, or - for stdin")
@@ -201,6 +265,27 @@ func init() {
 
 	of := documentOpenCmd.Flags()
 	of.BoolVarP(&docOpenNoBrowser, "no-browser", "n", false, "print the URL without launching the browser")
+
+	caf := documentCommentAddCmd.Flags()
+	caf.StringVar(&docCommentAddContent, "content", "", "comment content (required)")
+	caf.BoolVar(&docCommentAddAttention, "attention", false, "mark as important comment (attentionflg=1)")
+	caf.StringVarP(&docCommentAddOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	caf.StringVar(&docCommentAddJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	cgf := documentCommentGetCmd.Flags()
+	cgf.StringVarP(&docCommentGetOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	cgf.StringVar(&docCommentGetJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	cef := documentCommentEditCmd.Flags()
+	cef.StringVar(&docCommentEditContent, "content", "", "new comment content (omit to leave unchanged)")
+	cef.StringVar(&docCommentEditAttention, "attention", "", "new attention flag: 0 (normal) | 1 (important); omit to leave unchanged")
+	cef.StringVarP(&docCommentEditOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	cef.StringVar(&docCommentEditJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	cdf := documentCommentDeleteCmd.Flags()
+	cdf.BoolVarP(&docCommentDeleteYes, "yes", "y", false, "skip the interactive confirmation prompt")
+	cdf.StringVarP(&docCommentDeleteOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	cdf.StringVar(&docCommentDeleteJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
 }
 
 func runDocumentSearch(cmd *cobra.Command, args []string) error {
@@ -438,6 +523,157 @@ func runDocumentOpen(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("open browser: %w (run with --no-browser to print the URL)", err)
 	}
 	return nil
+}
+
+func runDocumentCommentAdd(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	if docCommentAddContent == "" {
+		return fmt.Errorf("--content is required")
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	req := xpoint.AddCommentRequest{Content: docCommentAddContent}
+	if docCommentAddAttention {
+		req.AttentionFlg = 1
+	}
+	res, err := client.AddComment(cmd.Context(), docID, req)
+	if err != nil {
+		return err
+	}
+	return render(res, resolveOutputFormat(docCommentAddOutput), docCommentAddJQ, func() error {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer w.Flush()
+		fmt.Fprintln(w, "DOCID\tSEQ\tMESSAGE_TYPE\tMESSAGE")
+		fmt.Fprintf(w, "%d\t%d\t%d\t%s\n", res.DocID, res.Seq, res.MessageType, res.Message)
+		return nil
+	})
+}
+
+func runDocumentCommentGet(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	res, err := client.GetComments(cmd.Context(), docID)
+	if err != nil {
+		return err
+	}
+	return render(res, resolveOutputFormat(docCommentGetOutput), docCommentGetJQ, func() error {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer w.Flush()
+		fmt.Fprintln(w, "SEQ\tATTENTION\tWRITER\tWRITE_DATE\tCONTENT")
+		for _, cm := range res.CommentList {
+			attention := "-"
+			if cm.AttentionFlg {
+				attention = "*"
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", cm.SeqNo, attention, cm.WriterName, cm.WriteDate, cm.Content)
+		}
+		return nil
+	})
+}
+
+func runDocumentCommentEdit(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	seq, err := parseSeq(args[1])
+	if err != nil {
+		return err
+	}
+	if !cmd.Flags().Changed("content") && !cmd.Flags().Changed("attention") {
+		return fmt.Errorf("at least one of --content / --attention is required")
+	}
+	req := xpoint.UpdateCommentRequest{}
+	if cmd.Flags().Changed("content") {
+		v := docCommentEditContent
+		req.Content = &v
+	}
+	if cmd.Flags().Changed("attention") {
+		switch docCommentEditAttention {
+		case "0":
+			v := 0
+			req.AttentionFlg = &v
+		case "1":
+			v := 1
+			req.AttentionFlg = &v
+		default:
+			return fmt.Errorf("--attention must be 0 or 1, got %q", docCommentEditAttention)
+		}
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	res, err := client.UpdateComment(cmd.Context(), docID, seq, req)
+	if err != nil {
+		return err
+	}
+	return render(res, resolveOutputFormat(docCommentEditOutput), docCommentEditJQ, func() error {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer w.Flush()
+		fmt.Fprintln(w, "DOCID\tSEQ\tMESSAGE_TYPE\tMESSAGE")
+		fmt.Fprintf(w, "%d\t%d\t%d\t%s\n", res.DocID, res.Seq, res.MessageType, res.Message)
+		return nil
+	})
+}
+
+func runDocumentCommentDelete(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	seq, err := parseSeq(args[1])
+	if err != nil {
+		return err
+	}
+	if !docCommentDeleteYes && !confirmDeleteComment(docID, seq) {
+		return fmt.Errorf("aborted")
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	res, err := client.DeleteComment(cmd.Context(), docID, seq)
+	if err != nil {
+		return err
+	}
+	return render(res, resolveOutputFormat(docCommentDeleteOutput), docCommentDeleteJQ, func() error {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer w.Flush()
+		fmt.Fprintln(w, "DOCID\tSEQ\tMESSAGE_TYPE\tMESSAGE")
+		fmt.Fprintf(w, "%d\t%d\t%d\t%s\n", res.DocID, res.Seq, res.MessageType, res.Message)
+		return nil
+	})
+}
+
+func parseSeq(s string) (int, error) {
+	n, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("invalid seq %q: must be a positive integer", s)
+	}
+	return n, nil
+}
+
+func confirmDeleteComment(docID, seq int) bool {
+	fmt.Fprintf(os.Stderr, "Really delete comment seq=%d on document %d? [y/N]: ", seq, docID)
+	var ans string
+	_, _ = fmt.Fscanln(os.Stdin, &ans)
+	switch strings.ToLower(strings.TrimSpace(ans)) {
+	case "y", "yes":
+		return true
+	}
+	return false
 }
 
 // resolveDownloadPath decides the on-disk path for a downloaded PDF.

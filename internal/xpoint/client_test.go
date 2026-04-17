@@ -556,6 +556,121 @@ func TestDownloadPDF_ErrorResponse(t *testing.T) {
 	}
 }
 
+func TestAddComment_PostsBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s, want POST", r.Method)
+		}
+		if r.URL.Path != "/api/v1/documents/42/comments" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var decoded map[string]any
+		if err := json.Unmarshal(body, &decoded); err != nil {
+			t.Fatalf("body not JSON: %v (%s)", err, string(body))
+		}
+		if decoded["content"] != "hello" {
+			t.Errorf("content = %v", decoded["content"])
+		}
+		if decoded["attentionflg"].(float64) != 1 {
+			t.Errorf("attentionflg = %v", decoded["attentionflg"])
+		}
+		_, _ = w.Write([]byte(`{"docid":42,"seq":3,"message_type":3,"message":"コメントが追加されました"}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	res, err := c.AddComment(context.Background(), 42, AddCommentRequest{Content: "hello", AttentionFlg: 1})
+	if err != nil {
+		t.Fatalf("AddComment: %v", err)
+	}
+	if res.DocID != 42 || res.Seq != 3 {
+		t.Errorf("res = %+v", res)
+	}
+}
+
+func TestGetComments(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/api/v1/documents/999/comments" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"docid":999,"comment_list":[{"seqno":"1","attentionflg":true,"content":"c1","writername":"田中","writedate":"2023/01/01 12:00:00"}]}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	res, err := c.GetComments(context.Background(), 999)
+	if err != nil {
+		t.Fatalf("GetComments: %v", err)
+	}
+	if res.DocID != 999 || len(res.CommentList) != 1 {
+		t.Fatalf("res = %+v", res)
+	}
+	cm := res.CommentList[0]
+	if cm.SeqNo != "1" || !cm.AttentionFlg || cm.Content != "c1" || cm.WriterName != "田中" {
+		t.Errorf("comment = %+v", cm)
+	}
+}
+
+func TestUpdateComment_PatchesBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("method = %s, want PATCH", r.Method)
+		}
+		if r.URL.Path != "/api/v1/documents/100/comments/2" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var decoded map[string]any
+		if err := json.Unmarshal(body, &decoded); err != nil {
+			t.Fatalf("body not JSON: %v (%s)", err, string(body))
+		}
+		if decoded["content"] != "updated" {
+			t.Errorf("content = %v", decoded["content"])
+		}
+		if _, ok := decoded["attentionflg"]; ok {
+			t.Errorf("attentionflg should be omitted, got %v", decoded["attentionflg"])
+		}
+		_, _ = w.Write([]byte(`{"docid":100,"seq":2,"message_type":3,"message":"コメントが更新されました"}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	content := "updated"
+	res, err := c.UpdateComment(context.Background(), 100, 2, UpdateCommentRequest{Content: &content})
+	if err != nil {
+		t.Fatalf("UpdateComment: %v", err)
+	}
+	if res.DocID != 100 || res.Seq != 2 {
+		t.Errorf("res = %+v", res)
+	}
+}
+
+func TestDeleteComment(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("method = %s, want DELETE", r.Method)
+		}
+		if r.URL.Path != "/api/v1/documents/100/comments/5" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"docid":100,"seq":5,"message_type":3,"message":"コメントが削除されました"}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	res, err := c.DeleteComment(context.Background(), 100, 5)
+	if err != nil {
+		t.Fatalf("DeleteComment: %v", err)
+	}
+	if res.DocID != 100 || res.Seq != 5 {
+		t.Errorf("res = %+v", res)
+	}
+}
+
 func TestNewClient_BaseURL(t *testing.T) {
 	c := NewClient("acme", Auth{AccessToken: "t"})
 	if !strings.HasPrefix(c.baseURL, "https://acme.atledcloud.jp/xpoint") {

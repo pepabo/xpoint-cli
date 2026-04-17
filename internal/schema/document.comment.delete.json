@@ -1,0 +1,43 @@
+{
+  "method": "DELETE",
+  "path": "/api/v1/documents/{docid}/comments/{seq}",
+  "summary": "コメント削除",
+  "description": "指定された書類 ID に登録されているコメントを削除する。削除権限が必要。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    },
+    {
+      "name": "seq",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "コメント番号"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "docid": {
+        "type": "integer",
+        "description": "書類ID"
+      },
+      "seq": {
+        "type": "integer",
+        "description": "コメント番号"
+      },
+      "message_type": {
+        "type": "integer",
+        "description": "メッセージタイプ (3: INFO 固定)"
+      },
+      "message": {
+        "type": "string",
+        "description": "メッセージ内容"
+      }
+    }
+  }
+}
