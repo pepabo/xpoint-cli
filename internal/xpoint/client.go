@@ -374,6 +374,88 @@ func (c *Client) UploadUserMasterCSV(ctx context.Context, tableName, fileName st
 	return &out, nil
 }
 
+type WebhooklogEntry struct {
+	DomainCode string `json:"domain_code"`
+	DocID      string `json:"docid"`
+	FormCode   string `json:"form_code"`
+	RouteCode  string `json:"route_code"`
+	Title1     string `json:"title1"`
+	URL        string `json:"url"`
+	StatusCode string `json:"status_code"`
+	SendDate   string `json:"send_date"`
+	UUID       string `json:"uuid"`
+}
+
+type WebhooklogListResponse struct {
+	Data []WebhooklogEntry `json:"data"`
+}
+
+// WebhooklogListParams holds query parameters for GET /api/v1/system/webhooklog.
+type WebhooklogListParams struct {
+	From      string // from
+	To        string // to
+	DocID     *int   // docid
+	FormCode  string // form_code
+	RouteCode string // route_code
+	Status    string // status: all | success | failed
+	URL       string // url
+	Limit     *int   // limit
+	Offset    *int   // offset
+}
+
+func (p WebhooklogListParams) query() url.Values {
+	v := url.Values{}
+	if p.From != "" {
+		v.Set("from", p.From)
+	}
+	if p.To != "" {
+		v.Set("to", p.To)
+	}
+	if p.DocID != nil {
+		v.Set("docid", strconv.Itoa(*p.DocID))
+	}
+	if p.FormCode != "" {
+		v.Set("form_code", p.FormCode)
+	}
+	if p.RouteCode != "" {
+		v.Set("route_code", p.RouteCode)
+	}
+	if p.Status != "" {
+		v.Set("status", p.Status)
+	}
+	if p.URL != "" {
+		v.Set("url", p.URL)
+	}
+	if p.Limit != nil {
+		v.Set("limit", strconv.Itoa(*p.Limit))
+	}
+	if p.Offset != nil {
+		v.Set("offset", strconv.Itoa(*p.Offset))
+	}
+	return v
+}
+
+// ListWebhooklog calls GET /api/v1/system/webhooklog (admin).
+func (c *Client) ListWebhooklog(ctx context.Context, p WebhooklogListParams) (*WebhooklogListResponse, error) {
+	var out WebhooklogListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/system/webhooklog", p.query(), nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetWebhooklog calls GET /api/v1/system/webhooklog/{uuid} (admin). The
+// response contains request/response detail whose body may be an arbitrary
+// type, so it is returned as raw JSON.
+func (c *Client) GetWebhooklog(ctx context.Context, uuid string) (json.RawMessage, error) {
+	path := fmt.Sprintf("/api/v1/system/webhooklog/%s", url.PathEscape(uuid))
+	var out json.RawMessage
+	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 type Approval struct {
 	DocID            int      `json:"docid"`
 	Hidden           *bool    `json:"hidden,omitempty"`

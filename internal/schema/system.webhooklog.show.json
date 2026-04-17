@@ -1,0 +1,33 @@
+{
+  "method": "GET",
+  "path": "/api/v1/system/webhooklog/{uuid}",
+  "summary": "Webhook詳細ログ取得",
+  "description": "Webhook 送信ログの詳細情報 (リクエスト情報、レスポンス情報) を取得する。\n管理者権限が必要。\n",
+  "parameters": [
+    {
+      "name": "uuid",
+      "in": "path",
+      "required": true,
+      "type": "string",
+      "description": "Webhookログの UUID"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "domain_code": { "type": "string", "description": "ドメインコード" },
+      "docid": { "type": "string", "description": "書類ID" },
+      "url": { "type": "string", "description": "送信先URL" },
+      "status_code": { "type": "string", "description": "ステータスコード" },
+      "uuid": { "type": "string", "description": "UUID" },
+      "request": {
+        "type": "object",
+        "description": "リクエスト情報 (header/body 等)"
+      },
+      "response": {
+        "type": "object",
+        "description": "レスポンス情報 (header/body 等。body は送信先応答により文字列等になる場合がある)"
+      }
+    }
+  }
+}

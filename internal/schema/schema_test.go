@@ -43,6 +43,8 @@ func TestAliases_Sorted(t *testing.T) {
 		"system.master.list",
 		"system.master.show",
 		"system.master.upload",
+		"system.webhooklog.list",
+		"system.webhooklog.show",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("aliases = %v", got)

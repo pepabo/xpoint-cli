@@ -1,0 +1,85 @@
+{
+  "method": "GET",
+  "path": "/api/v1/system/webhooklog",
+  "summary": "Webhookログ取得",
+  "description": "Webhook の送信日時等を指定して Webhook 送信ログを検索・取得する。\n管理者権限が必要。\n",
+  "parameters": [
+    {
+      "name": "from",
+      "in": "query",
+      "type": "string",
+      "description": "送信日時 From (例: 2022/10/01)"
+    },
+    {
+      "name": "to",
+      "in": "query",
+      "type": "string",
+      "description": "送信日時 To (例: 2022/12/01)"
+    },
+    {
+      "name": "docid",
+      "in": "query",
+      "type": "integer",
+      "description": "書類ID"
+    },
+    {
+      "name": "form_code",
+      "in": "query",
+      "type": "string",
+      "description": "フォームコード"
+    },
+    {
+      "name": "route_code",
+      "in": "query",
+      "type": "string",
+      "description": "承認ルートコード"
+    },
+    {
+      "name": "status",
+      "in": "query",
+      "type": "string",
+      "description": "ステータス: all | success | failed"
+    },
+    {
+      "name": "url",
+      "in": "query",
+      "type": "string",
+      "description": "送信先URL (部分一致)"
+    },
+    {
+      "name": "limit",
+      "in": "query",
+      "type": "integer",
+      "description": "取得件数 (default 50, 推奨 1000 以下)"
+    },
+    {
+      "name": "offset",
+      "in": "query",
+      "type": "integer",
+      "description": "取得開始位置 (default 0)"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "type": "array",
+        "description": "ログデータ (存在しない場合は空配列)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "domain_code": { "type": "string", "description": "ドメインコード" },
+            "docid": { "type": "string", "description": "書類ID" },
+            "form_code": { "type": "string", "description": "フォームコード" },
+            "route_code": { "type": "string", "description": "承認ルートコード" },
+            "title1": { "type": "string", "description": "件名" },
+            "url": { "type": "string", "description": "送信先URL" },
+            "status_code": { "type": "string", "description": "ステータスコード" },
+            "send_date": { "type": "string", "description": "送信日時" },
+            "uuid": { "type": "string", "description": "UUID (詳細取得に使用)" }
+          }
+        }
+      }
+    }
+  }
+}
