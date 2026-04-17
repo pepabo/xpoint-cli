@@ -43,6 +43,10 @@ func TestAliases_Sorted(t *testing.T) {
 		"system.master.list",
 		"system.master.show",
 		"system.master.upload",
+		"system.webhook.add",
+		"system.webhook.delete",
+		"system.webhook.list",
+		"system.webhook.update",
 		"system.webhooklog.list",
 		"system.webhooklog.show",
 	}

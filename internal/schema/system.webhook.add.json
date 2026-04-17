@@ -1,0 +1,38 @@
+{
+  "method": "POST",
+  "path": "/api/v1/system/{fid}/webhooks",
+  "summary": "Webhook設定登録",
+  "description": "指定したフォームに Webhook 設定を登録する。\n管理者権限が必要。\n",
+  "parameters": [
+    {
+      "name": "fid",
+      "in": "path",
+      "required": true,
+      "type": "integer",
+      "description": "フォームID"
+    }
+  ],
+  "requestBody": {
+    "contentType": "application/json",
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "required": true,
+        "description": "送信先URL (無効な URL はエラー)"
+      },
+      "remarks": {
+        "type": "string",
+        "description": "備考"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "integer", "description": "Webhook ID" },
+      "url": { "type": "string", "description": "送信先URL" },
+      "remarks": { "type": "string", "description": "備考" }
+    }
+  }
+}
