@@ -1,0 +1,27 @@
+{
+  "method": "GET",
+  "path": "/api/v1/attachments/{docid}/{attach_seq}",
+  "summary": "添付ファイル取得",
+  "description": "指定された書類 ID と添付番号の添付ファイルをダウンロードする。閲覧権限が必要。\nレスポンスは添付ファイルのバイナリ (Content-Disposition でファイル名を返却)。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    },
+    {
+      "name": "attach_seq",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "添付番号 (添付ファイル一覧取得で取得した seq)"
+    }
+  ],
+  "response": {
+    "type": "string",
+    "format": "binary",
+    "description": "添付ファイルの中身。Content-Disposition ヘッダでサーバ提供ファイル名を返す。"
+  }
+}

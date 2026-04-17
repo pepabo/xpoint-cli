@@ -9,6 +9,11 @@ func TestAliases_Sorted(t *testing.T) {
 	got := Aliases()
 	want := []string{
 		"approval.list",
+		"document.attachment.add",
+		"document.attachment.delete",
+		"document.attachment.get",
+		"document.attachment.list",
+		"document.attachment.update",
 		"document.comment.add",
 		"document.comment.delete",
 		"document.comment.edit",
@@ -237,6 +242,79 @@ func TestLookup_FormShow(t *testing.T) {
 	first, _ := params[0].(map[string]any)
 	if first["name"] != "fid" || first["required"] != true || first["type"] != "integer" {
 		t.Errorf("fid param = %v", first)
+	}
+}
+
+func TestLookup_DocumentAttachmentAdd(t *testing.T) {
+	op, err := Lookup("document.attachment.add")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "POST" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/multiapi/v1/attachments/{docid}" {
+		t.Errorf("path = %v", op["path"])
+	}
+	body, _ := op["requestBody"].(map[string]any)
+	if body["contentType"] != "multipart/form-data" {
+		t.Errorf("contentType = %v", body["contentType"])
+	}
+}
+
+func TestLookup_DocumentAttachmentList(t *testing.T) {
+	op, err := Lookup("document.attachment.list")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "GET" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/attachments/{docid}" {
+		t.Errorf("path = %v", op["path"])
+	}
+}
+
+func TestLookup_DocumentAttachmentGet(t *testing.T) {
+	op, err := Lookup("document.attachment.get")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "GET" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/attachments/{docid}/{attach_seq}" {
+		t.Errorf("path = %v", op["path"])
+	}
+	params, _ := op["parameters"].([]any)
+	if len(params) != 2 {
+		t.Fatalf("parameters = %v", params)
+	}
+}
+
+func TestLookup_DocumentAttachmentUpdate(t *testing.T) {
+	op, err := Lookup("document.attachment.update")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "PATCH" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/multiapi/v1/attachments/{docid}/{attach_seq}" {
+		t.Errorf("path = %v", op["path"])
+	}
+}
+
+func TestLookup_DocumentAttachmentDelete(t *testing.T) {
+	op, err := Lookup("document.attachment.delete")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "PATCH" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/multiapi/v1/attachments/{docid}/{attach_seq}" {
+		t.Errorf("path = %v", op["path"])
 	}
 }
 
