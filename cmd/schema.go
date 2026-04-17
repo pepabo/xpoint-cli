@@ -24,6 +24,7 @@ Supported aliases map to the CLI's commands:
   document.get      GET    /api/v1/documents/{docid}
   document.update   PATCH  /api/v1/documents/{docid}
   document.delete   DELETE /api/v1/documents/{docid}
+  document.download GET    /api/v1/documents/{docid}/pdf
 
 Run without arguments to list supported aliases.`,
 	Args: cobra.MaximumNArgs(1),

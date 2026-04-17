@@ -11,6 +11,7 @@ func TestAliases_Sorted(t *testing.T) {
 		"approval.list",
 		"document.create",
 		"document.delete",
+		"document.download",
 		"document.get",
 		"document.search",
 		"document.update",
@@ -123,6 +124,19 @@ func TestLookup_DocumentUpdate(t *testing.T) {
 	rc, _ := props["route_code"].(map[string]any)
 	if rc["required"] != true {
 		t.Errorf("route_code.required = %v", rc["required"])
+	}
+}
+
+func TestLookup_DocumentDownload(t *testing.T) {
+	op, err := Lookup("document.download")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "GET" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/documents/{docid}/pdf" {
+		t.Errorf("path = %v", op["path"])
 	}
 }
 

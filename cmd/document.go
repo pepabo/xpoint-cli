@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -35,6 +36,8 @@ var (
 	docDeleteYes    bool
 	docDeleteOutput string
 	docDeleteJQ     string
+
+	docDownloadOutput string
 )
 
 var documentCmd = &cobra.Command{
@@ -109,6 +112,20 @@ By default the command prompts for confirmation. Pass --yes to skip it.`,
 	RunE: runDocumentDelete,
 }
 
+var documentDownloadCmd = &cobra.Command{
+	Use:   "download <docid>",
+	Short: "Download a document as PDF",
+	Long: `Download a document as PDF via GET /api/v1/documents/{docid}/pdf.
+
+By default the PDF is saved to the current directory using the filename
+provided by the server (Content-Disposition). Use --output to override:
+  --output FILE    save to FILE
+  --output DIR/    save into DIR/ using the server-provided filename
+  --output -       write the PDF to stdout`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentDownload,
+}
+
 func init() {
 	rootCmd.AddCommand(documentCmd)
 	documentCmd.AddCommand(documentSearchCmd)
@@ -116,6 +133,7 @@ func init() {
 	documentCmd.AddCommand(documentGetCmd)
 	documentCmd.AddCommand(documentEditCmd)
 	documentCmd.AddCommand(documentDeleteCmd)
+	documentCmd.AddCommand(documentDownloadCmd)
 
 	f := documentSearchCmd.Flags()
 	f.StringVar(&docSearchBody, "body", "", "search condition JSON: inline, file path, or - for stdin")
@@ -143,6 +161,9 @@ func init() {
 	df.BoolVarP(&docDeleteYes, "yes", "y", false, "skip the interactive confirmation prompt")
 	df.StringVarP(&docDeleteOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
 	df.StringVar(&docDeleteJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	dlf := documentDownloadCmd.Flags()
+	dlf.StringVarP(&docDownloadOutput, "output", "o", "", "output path: FILE, DIR/, or - for stdout (default: server-provided filename in current directory)")
 }
 
 func runDocumentSearch(cmd *cobra.Command, args []string) error {
@@ -310,6 +331,59 @@ func runDocumentDelete(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(w, "%d\t%s\n", res.MessageType, res.Message)
 		return nil
 	})
+}
+
+func runDocumentDownload(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+
+	filename, data, err := client.DownloadPDF(cmd.Context(), docID)
+	if err != nil {
+		return err
+	}
+
+	out := docDownloadOutput
+	if out == "-" {
+		_, werr := os.Stdout.Write(data)
+		return werr
+	}
+
+	dst := resolveDownloadPath(out, filename, docID)
+	if err := os.WriteFile(dst, data, 0o600); err != nil {
+		return fmt.Errorf("write pdf: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "saved: %s (%d bytes)\n", dst, len(data))
+	return nil
+}
+
+// resolveDownloadPath decides the on-disk path for a downloaded PDF.
+//
+// When out is empty, the server-provided filename is used in the current
+// directory (falling back to "<docid>.pdf"). When out ends with a path
+// separator or names an existing directory, the server-provided filename is
+// placed inside it. Otherwise out is used verbatim as the file path. The
+// server-provided name is base-name-cleaned to avoid path traversal.
+func resolveDownloadPath(out, serverName string, docID int) string {
+	name := filepath.Base(filepath.Clean(serverName))
+	if name == "." || name == string(filepath.Separator) || name == "" {
+		name = fmt.Sprintf("%d.pdf", docID)
+	}
+	if out == "" {
+		return name
+	}
+	if strings.HasSuffix(out, string(os.PathSeparator)) || strings.HasSuffix(out, "/") {
+		return filepath.Join(out, name)
+	}
+	if info, err := os.Stat(out); err == nil && info.IsDir() {
+		return filepath.Join(out, name)
+	}
+	return out
 }
 
 func parseDocID(s string) (int, error) {

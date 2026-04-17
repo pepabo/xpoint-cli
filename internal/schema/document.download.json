@@ -1,0 +1,19 @@
+{
+  "method": "GET",
+  "path": "/api/v1/documents/{docid}/pdf",
+  "summary": "PDFダウンロード",
+  "description": "指定された ID の書類の PDF をダウンロードする。閲覧権限が必要。OAuth2 認証を利用する場合は対象書類へのアクセス権限が必要。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    }
+  ],
+  "response": {
+    "type": "binary",
+    "description": "PDF バイナリ (Content-Type: application/pdf)。ファイル名は Content-Disposition ヘッダで返却され、RFC 5987 の filename* 形式を含む。"
+  }
+}
