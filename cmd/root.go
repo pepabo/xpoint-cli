@@ -17,18 +17,14 @@ var (
 	flagAPIAccessToken  string
 )
 
-var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
-)
+var version = "1.0.0"
 
 var rootCmd = &cobra.Command{
 	Use:          "xp",
 	Short:        "X-point CLI",
 	Long:         "xp is a CLI client for X-point (https://atled-workflow.github.io/X-point-doc/api/).",
 	SilenceUsage: true,
-	Version:      fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
+	Version:      version,
 }
 
 func Execute() {
