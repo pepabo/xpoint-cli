@@ -103,15 +103,15 @@ type ApprovalsListResponse struct {
 // ApprovalsListParams holds query parameters for GET /api/v1/approvals.
 // Stat is required. Zero values for *int / string / *bool mean "omit".
 type ApprovalsListParams struct {
-	Stat          int     // required
-	FormGroupID   *int    // fgid
-	FormID        *int    // fid
-	Step          *int    // step
-	RecordNo      *int    // record_no
-	GetLine       *int    // get_line
-	ProxyUser     string  // proxy_user
-	Filter        string  // filter
-	ShowHiddenDoc *bool   // show_hidden_doc
+	Stat          int    // required
+	FormGroupID   *int   // fgid
+	FormID        *int   // fid
+	Step          *int   // step
+	RecordNo      *int   // record_no
+	GetLine       *int   // get_line
+	ProxyUser     string // proxy_user
+	Filter        string // filter
+	ShowHiddenDoc *bool  // show_hidden_doc
 }
 
 func (p ApprovalsListParams) query() url.Values {
