@@ -55,6 +55,31 @@ var (
 
 	docOpenNoBrowser bool
 
+	docDocviewFormCode  string
+	docDocviewFormName  string
+	docDocviewRouteCode string
+	docDocviewFromDocID int
+	docDocviewProxyUser string
+	docDocviewOutput    string
+
+	docDocviewUploadFormCode     string
+	docDocviewUploadFormName     string
+	docDocviewUploadRouteCode    string
+	docDocviewUploadFromDocID    int
+	docDocviewUploadProxyUser    string
+	docDocviewUploadDatas        string
+	docDocviewUploadFile         string
+	docDocviewUploadFileName     string
+	docDocviewUploadRemarks      string
+	docDocviewUploadDetailNo     int
+	docDocviewUploadEvidenceType int
+	docDocviewUploadOutput       string
+
+	docOpenviewProxyUser string
+	docOpenviewOutput    string
+
+	docStatusviewOutput string
+
 	docCommentAddContent    string
 	docCommentAddAttention  bool
 	docCommentAddOutput     string
@@ -226,6 +251,59 @@ By default the command prompts for confirmation. Pass --yes to skip it.`,
 	RunE: runDocumentCommentDelete,
 }
 
+var documentDocviewCmd = &cobra.Command{
+	Use:   "docview",
+	Short: "Fetch the HTML view for creating a new document or a related document",
+	Long: `Fetch the HTML form used to create a new document or a related document via
+GET /api/v1/documents/docview.
+
+Specify the target form with either --form-code or --form-name (form name takes
+priority on the server side if both are given). --route-code is required; pass
+an empty string ("") for standard forms or "--condroute" for workflow forms
+with auto-select routes.
+
+By default the HTML is saved to a file named like "docview-<fcd|formname>.html"
+in the current directory. Use --output to override:
+  --output FILE    save to FILE
+  --output DIR/    save into DIR/ using the default filename
+  --output -       write the HTML to stdout`,
+	Args: cobra.NoArgs,
+	RunE: runDocumentDocview,
+}
+
+var documentDocviewUploadCmd = &cobra.Command{
+	Use:   "docview-upload",
+	Short: "Fetch the HTML form for a new document with pre-filled data or attachment (multipart)",
+	Long: `Fetch the HTML form for creating a new document or a related document with
+pre-filled field values and/or a pre-attached file via POST
+/multiapi/v1/documents/docview.
+
+Specify the target form with either --form-code or --form-name. --route-code
+is required. Pass --datas to supply pre-fill JSON, and --file to attach a
+single file (--file-name defaults to basename of --file).`,
+	Args: cobra.NoArgs,
+	RunE: runDocumentDocviewUpload,
+}
+
+var documentOpenviewCmd = &cobra.Command{
+	Use:   "openview <docid>",
+	Short: "Fetch the HTML view of a document",
+	Long: `Fetch the HTML view of a document via GET /api/v1/documents/{docid}/openview.
+
+The HTML is the same rendering as the X-point viewer but cannot be closed by
+the in-page close button (use the browser tab/window close instead).`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentOpenview,
+}
+
+var documentStatusviewCmd = &cobra.Command{
+	Use:   "statusview <docid>",
+	Short: "Fetch the HTML of the approval status view",
+	Long:  "Fetch the HTML of the approval status view via GET /api/v1/documents/{docid}/statusview.",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runDocumentStatusview,
+}
+
 var documentDownloadCmd = &cobra.Command{
 	Use:   "download <docid>",
 	Short: "Download a document as PDF",
@@ -249,6 +327,10 @@ func init() {
 	documentCmd.AddCommand(documentDeleteCmd)
 	documentCmd.AddCommand(documentStatusCmd)
 	documentCmd.AddCommand(documentDownloadCmd)
+	documentCmd.AddCommand(documentDocviewCmd)
+	documentCmd.AddCommand(documentDocviewUploadCmd)
+	documentCmd.AddCommand(documentOpenviewCmd)
+	documentCmd.AddCommand(documentStatusviewCmd)
 	documentCmd.AddCommand(documentOpenCmd)
 	documentCmd.AddCommand(documentCommentCmd)
 	documentCommentCmd.AddCommand(documentCommentAddCmd)
@@ -301,6 +383,35 @@ func init() {
 
 	of := documentOpenCmd.Flags()
 	of.BoolVarP(&docOpenNoBrowser, "no-browser", "n", false, "print the URL without launching the browser")
+
+	dvf := documentDocviewCmd.Flags()
+	dvf.StringVar(&docDocviewFormCode, "form-code", "", "form code (fcd); use --form-name instead or in addition (form-name wins)")
+	dvf.StringVar(&docDocviewFormName, "form-name", "", "form name")
+	dvf.StringVar(&docDocviewRouteCode, "route-code", "", "approval route code (required; \"\" for standard forms, \"--condroute\" for auto-select workflow routes)")
+	dvf.IntVar(&docDocviewFromDocID, "from-docid", 0, "source document ID for a related document (0 = omit)")
+	dvf.StringVar(&docDocviewProxyUser, "proxy-user", "", "proxy applicant user code (代理申請)")
+	dvf.StringVarP(&docDocviewOutput, "output", "o", "", "output path: FILE, DIR/, or - for stdout (default: docview-<form>.html in current dir)")
+
+	duf := documentDocviewUploadCmd.Flags()
+	duf.StringVar(&docDocviewUploadFormCode, "form-code", "", "form code (fcd)")
+	duf.StringVar(&docDocviewUploadFormName, "form-name", "", "form name (wins over --form-code when both are given)")
+	duf.StringVar(&docDocviewUploadRouteCode, "route-code", "", "approval route code (required)")
+	duf.IntVar(&docDocviewUploadFromDocID, "from-docid", 0, "source document ID for a related document (0 = omit)")
+	duf.StringVar(&docDocviewUploadProxyUser, "proxy-user", "", "proxy applicant user code")
+	duf.StringVar(&docDocviewUploadDatas, "datas", "", "pre-fill data JSON: inline, file path, or - for stdin")
+	duf.StringVar(&docDocviewUploadFile, "file", "", "path to a file to pre-attach (at most one file)")
+	duf.StringVar(&docDocviewUploadFileName, "file-name", "", "override the attachment filename (default: basename of --file)")
+	duf.StringVar(&docDocviewUploadRemarks, "remarks", "", "attachment remarks (備考)")
+	duf.IntVar(&docDocviewUploadDetailNo, "detail-no", 0, "detail row number for an attachment-type form (0 = omit)")
+	duf.IntVar(&docDocviewUploadEvidenceType, "evidence-type", -1, "電帳法書類区分 0:その他 / 1:電子取引 (-1 = omit; default 1 on server)")
+	duf.StringVarP(&docDocviewUploadOutput, "output", "o", "", "output path: FILE, DIR/, or - for stdout (default: docview-<form>.html in current dir)")
+
+	ovf := documentOpenviewCmd.Flags()
+	ovf.StringVar(&docOpenviewProxyUser, "proxy-user", "", "proxy user code (代理モードで書類を表示)")
+	ovf.StringVarP(&docOpenviewOutput, "output", "o", "", "output path: FILE, DIR/, or - for stdout (default: openview-<docid>.html in current dir)")
+
+	svf := documentStatusviewCmd.Flags()
+	svf.StringVarP(&docStatusviewOutput, "output", "o", "", "output path: FILE, DIR/, or - for stdout (default: statusview-<docid>.html in current dir)")
 
 	caf := documentCommentAddCmd.Flags()
 	caf.StringVar(&docCommentAddContent, "content", "", "comment content (required)")
@@ -558,6 +669,208 @@ func runDocumentDownload(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintf(os.Stderr, "saved: %s (%d bytes)\n", dst, len(data))
 	return nil
+}
+
+func runDocumentDocview(cmd *cobra.Command, args []string) error {
+	if docDocviewFormCode == "" && docDocviewFormName == "" {
+		return fmt.Errorf("either --form-code or --form-name is required")
+	}
+	if !cmd.Flags().Changed("route-code") {
+		return fmt.Errorf("--route-code is required (use an empty string \"\" for standard forms)")
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	params := xpoint.DocviewParams{
+		FormCode:  docDocviewFormCode,
+		FormName:  docDocviewFormName,
+		RouteCode: docDocviewRouteCode,
+		ProxyUser: docDocviewProxyUser,
+	}
+	if docDocviewFromDocID != 0 {
+		v := docDocviewFromDocID
+		params.FromDocID = &v
+	}
+
+	data, err := client.GetDocview(cmd.Context(), params)
+	if err != nil {
+		return err
+	}
+	defaultName := defaultDocviewFilename("docview", params.FormCode, params.FormName, 0)
+	return writeHTMLOutput(docDocviewOutput, defaultName, data)
+}
+
+func runDocumentDocviewUpload(cmd *cobra.Command, args []string) error {
+	if docDocviewUploadFormCode == "" && docDocviewUploadFormName == "" {
+		return fmt.Errorf("either --form-code or --form-name is required")
+	}
+	if !cmd.Flags().Changed("route-code") {
+		return fmt.Errorf("--route-code is required (use an empty string \"\" for standard forms)")
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+
+	params := xpoint.DocviewMultipartParams{
+		FormCode:  docDocviewUploadFormCode,
+		FormName:  docDocviewUploadFormName,
+		RouteCode: docDocviewUploadRouteCode,
+		ProxyUser: docDocviewUploadProxyUser,
+	}
+	if docDocviewUploadFromDocID != 0 {
+		v := docDocviewUploadFromDocID
+		params.FromDocID = &v
+	}
+	if docDocviewUploadDatas != "" {
+		datas, err := loadStringInput(docDocviewUploadDatas)
+		if err != nil {
+			return fmt.Errorf("load --datas: %w", err)
+		}
+		params.Datas = datas
+	}
+	if docDocviewUploadFile != "" {
+		content, err := os.ReadFile(docDocviewUploadFile)
+		if err != nil {
+			return fmt.Errorf("read --file: %w", err)
+		}
+		name := docDocviewUploadFileName
+		if name == "" {
+			name = filepath.Base(docDocviewUploadFile)
+		}
+		f := &xpoint.DocviewMultipartFile{
+			Name:    name,
+			Remarks: docDocviewUploadRemarks,
+			Content: content,
+		}
+		if cmd.Flags().Changed("detail-no") {
+			v := docDocviewUploadDetailNo
+			f.DetailNo = &v
+		}
+		if docDocviewUploadEvidenceType >= 0 {
+			v := docDocviewUploadEvidenceType
+			f.EvidenceType = &v
+		}
+		params.File = f
+	}
+
+	data, err := client.PostDocviewMultipart(cmd.Context(), params)
+	if err != nil {
+		return err
+	}
+	defaultName := defaultDocviewFilename("docview", params.FormCode, params.FormName, 0)
+	return writeHTMLOutput(docDocviewUploadOutput, defaultName, data)
+}
+
+func runDocumentOpenview(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	data, err := client.GetDocumentOpenview(cmd.Context(), docID, docOpenviewProxyUser)
+	if err != nil {
+		return err
+	}
+	defaultName := defaultDocviewFilename("openview", "", "", docID)
+	return writeHTMLOutput(docOpenviewOutput, defaultName, data)
+}
+
+func runDocumentStatusview(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	data, err := client.GetDocumentStatusview(cmd.Context(), docID)
+	if err != nil {
+		return err
+	}
+	defaultName := defaultDocviewFilename("statusview", "", "", docID)
+	return writeHTMLOutput(docStatusviewOutput, defaultName, data)
+}
+
+// defaultDocviewFilename builds a reasonable default output filename for
+// docview/openview/statusview HTML responses.
+func defaultDocviewFilename(prefix, formCode, formName string, docID int) string {
+	switch {
+	case docID > 0:
+		return fmt.Sprintf("%s-%d.html", prefix, docID)
+	case formCode != "":
+		return fmt.Sprintf("%s-%s.html", prefix, sanitizeFilename(formCode))
+	case formName != "":
+		return fmt.Sprintf("%s-%s.html", prefix, sanitizeFilename(formName))
+	default:
+		return prefix + ".html"
+	}
+}
+
+func sanitizeFilename(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case '/', '\\', ':', '*', '?', '"', '<', '>', '|', '\x00':
+			b.WriteRune('_')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// writeHTMLOutput writes HTML bytes to stdout (out == "-"), to a path given
+// by out (FILE or DIR/), or to defaultName in the current directory when out
+// is empty.
+func writeHTMLOutput(out, defaultName string, data []byte) error {
+	if out == "-" {
+		_, err := os.Stdout.Write(data)
+		return err
+	}
+	var dst string
+	switch {
+	case out == "":
+		dst = defaultName
+	case strings.HasSuffix(out, string(os.PathSeparator)) || strings.HasSuffix(out, "/"):
+		dst = filepath.Join(out, defaultName)
+	default:
+		if info, err := os.Stat(out); err == nil && info.IsDir() {
+			dst = filepath.Join(out, defaultName)
+		} else {
+			dst = out
+		}
+	}
+	if err := os.WriteFile(dst, data, 0o600); err != nil {
+		return fmt.Errorf("write html: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "saved: %s (%d bytes)\n", dst, len(data))
+	return nil
+}
+
+// loadStringInput accepts an inline string, a file path, or "-" for stdin
+// and returns the resulting string content.
+func loadStringInput(s string) (string, error) {
+	if s == "-" {
+		b, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return "", fmt.Errorf("read stdin: %w", err)
+		}
+		return string(b), nil
+	}
+	if info, err := os.Stat(s); err == nil && !info.IsDir() {
+		b, err := os.ReadFile(s)
+		if err != nil {
+			return "", fmt.Errorf("read file: %w", err)
+		}
+		return string(b), nil
+	}
+	return s, nil
 }
 
 func runDocumentOpen(_ *cobra.Command, args []string) error {

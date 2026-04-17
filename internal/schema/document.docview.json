@@ -1,0 +1,43 @@
+{
+  "method": "GET",
+  "path": "/api/v1/documents/docview",
+  "summary": "新規書類・関連書類作成 (HTMLビュー取得)",
+  "description": "書類の新規作成、または関連書類作成のための書類ビューHTMLを取得する。取得したHTMLはそのままブラウザで表示可能。",
+  "parameters": [
+    {
+      "name": "fcd",
+      "in": "query",
+      "type": "string",
+      "description": "フォームコード (fcd と formname のいずれかを指定。両方指定した場合は formname が優先される)"
+    },
+    {
+      "name": "formname",
+      "in": "query",
+      "type": "string",
+      "description": "フォーム名称"
+    },
+    {
+      "name": "routecd",
+      "in": "query",
+      "type": "string",
+      "required": true,
+      "description": "承認ルートコード。ユーザ選択ルートはルートコードを指定、自動選択ルートは空文字または \"--condroute\"、標準フォームは空文字を指定"
+    },
+    {
+      "name": "fromdocid",
+      "in": "query",
+      "type": "integer",
+      "description": "関連元書類の書類ID (関連書類作成時に指定)"
+    },
+    {
+      "name": "proxy_user",
+      "in": "query",
+      "type": "string",
+      "description": "代理申請者のユーザコード"
+    }
+  ],
+  "response": {
+    "contentType": "text/html",
+    "description": "書類ビューHTML"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "path": "/api/v1/documents/{docid}/openview",
+  "summary": "書類表示 (HTMLビュー取得)",
+  "description": "指定された書類IDの書類を表示するためのHTML (JavaScript含む) 一式を取得する。本APIで表示したHTMLはナビの閉じるボタンで閉じることができず、ブラウザのウィンドウやタブで閉じる必要がある。",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    },
+    {
+      "name": "proxy_user",
+      "in": "query",
+      "type": "string",
+      "description": "代理モードで書類を表示する際のユーザコード"
+    }
+  ],
+  "response": {
+    "contentType": "text/html",
+    "description": "書類ビューHTML"
+  }
+}

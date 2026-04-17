@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"strconv"
@@ -632,14 +634,39 @@ func (c *Client) GetDocumentStatus(ctx context.Context, docID int, history bool)
 // does not provide one.
 func (c *Client) DownloadPDF(ctx context.Context, docID int) (string, []byte, error) {
 	path := fmt.Sprintf("/api/v1/documents/%d/pdf", docID)
-	u := c.baseURL + path
+	filename, body, err := c.downloadBytes(ctx, http.MethodGet, path, nil, nil, "", "application/pdf")
+	return filename, body, err
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+// downloadBytes issues an HTTP request and returns the raw response bytes
+// and the server-provided filename (from Content-Disposition). It is used
+// for endpoints that return non-JSON payloads (PDF, HTML, etc.).
+//
+// accept is the Accept header value. contentType is the Content-Type of
+// the request body; pass "" when body is nil or when Content-Type should
+// be left unset (e.g. multipart where the caller sets the boundary).
+func (c *Client) downloadBytes(ctx context.Context, method, path string, q url.Values, body []byte, contentType, accept string) (string, []byte, error) {
+	u := c.baseURL + path
+	if len(q) > 0 {
+		u += "?" + q.Encode()
+	}
+
+	var reqBody io.Reader
+	if body != nil {
+		reqBody = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, u, reqBody)
 	if err != nil {
 		return "", nil, err
 	}
 	c.auth.apply(req)
-	req.Header.Set("Accept", "application/pdf")
+	if accept != "" {
+		req.Header.Set("Accept", accept)
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
 
 	debug := os.Getenv("XP_DEBUG") != ""
 	if debug {
@@ -652,20 +679,168 @@ func (c *Client) DownloadPDF(ctx context.Context, docID int) (string, []byte, er
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", nil, fmt.Errorf("read response body: %w", err)
 	}
 	if debug {
-		fmt.Fprintf(os.Stderr, "[xp] <- %s (%d bytes)\n", resp.Status, len(body))
+		fmt.Fprintf(os.Stderr, "[xp] <- %s (%d bytes)\n", resp.Status, len(respBody))
 		if resp.StatusCode/100 != 2 {
-			fmt.Fprintf(os.Stderr, "[xp]    %s\n", string(body))
+			fmt.Fprintf(os.Stderr, "[xp]    %s\n", string(respBody))
 		}
 	}
 	if resp.StatusCode/100 != 2 {
-		return "", nil, fmt.Errorf("xpoint api error: %s: %s", resp.Status, string(body))
+		return "", nil, fmt.Errorf("xpoint api error: %s: %s", resp.Status, string(respBody))
 	}
-	return parseContentDispositionFilename(resp.Header.Get("Content-Disposition")), body, nil
+	return parseContentDispositionFilename(resp.Header.Get("Content-Disposition")), respBody, nil
+}
+
+// DocviewParams holds query parameters for GET /api/v1/documents/docview.
+// Exactly one of FormCode or FormName must be provided. RouteCode is always
+// required (empty string is a valid value for auto-select / standard forms).
+type DocviewParams struct {
+	FormCode  string // fcd
+	FormName  string // formname
+	RouteCode string // routecd (required, can be empty string)
+	FromDocID *int   // fromdocid
+	ProxyUser string // proxy_user
+}
+
+func (p DocviewParams) query() url.Values {
+	v := url.Values{}
+	if p.FormCode != "" {
+		v.Set("fcd", p.FormCode)
+	}
+	if p.FormName != "" {
+		v.Set("formname", p.FormName)
+	}
+	v.Set("routecd", p.RouteCode)
+	if p.FromDocID != nil {
+		v.Set("fromdocid", strconv.Itoa(*p.FromDocID))
+	}
+	if p.ProxyUser != "" {
+		v.Set("proxy_user", p.ProxyUser)
+	}
+	return v
+}
+
+// GetDocview calls GET /api/v1/documents/docview and returns the HTML bytes.
+func (c *Client) GetDocview(ctx context.Context, p DocviewParams) ([]byte, error) {
+	_, body, err := c.downloadBytes(ctx, http.MethodGet, "/api/v1/documents/docview", p.query(), nil, "", "text/html")
+	return body, err
+}
+
+// GetDocumentOpenview calls GET /api/v1/documents/{docid}/openview and
+// returns the HTML bytes for viewing a document.
+func (c *Client) GetDocumentOpenview(ctx context.Context, docID int, proxyUser string) ([]byte, error) {
+	path := fmt.Sprintf("/api/v1/documents/%d/openview", docID)
+	var q url.Values
+	if proxyUser != "" {
+		q = url.Values{}
+		q.Set("proxy_user", proxyUser)
+	}
+	_, body, err := c.downloadBytes(ctx, http.MethodGet, path, q, nil, "", "text/html")
+	return body, err
+}
+
+// GetDocumentStatusview calls GET /api/v1/documents/{docid}/statusview and
+// returns the HTML bytes for the approval status view.
+func (c *Client) GetDocumentStatusview(ctx context.Context, docID int) ([]byte, error) {
+	path := fmt.Sprintf("/api/v1/documents/%d/statusview", docID)
+	_, body, err := c.downloadBytes(ctx, http.MethodGet, path, nil, nil, "", "text/html")
+	return body, err
+}
+
+// DocviewMultipartFile describes a file to attach to the multipart docview
+// request. Name is the filename the server records; Remarks is the optional
+// file description (備考). Content is the raw file bytes.
+type DocviewMultipartFile struct {
+	Name         string
+	Remarks      string
+	DetailNo     *int
+	EvidenceType *int
+	Content      []byte
+}
+
+// DocviewMultipartParams holds the multipart body of POST
+// /multiapi/v1/documents/docview. Exactly one of FormCode or FormName must
+// be provided. RouteCode is required.
+type DocviewMultipartParams struct {
+	FormCode  string
+	FormName  string
+	RouteCode string
+	FromDocID *int
+	ProxyUser string
+	Datas     string // JSON-stringified pre-fill data
+	File      *DocviewMultipartFile
+}
+
+// PostDocviewMultipart calls POST /multiapi/v1/documents/docview and
+// returns the HTML bytes.
+func (c *Client) PostDocviewMultipart(ctx context.Context, p DocviewMultipartParams) ([]byte, error) {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+
+	writeField := func(name, value string) error {
+		if value == "" {
+			return nil
+		}
+		return mw.WriteField(name, value)
+	}
+	if err := writeField("fcd", p.FormCode); err != nil {
+		return nil, fmt.Errorf("write fcd: %w", err)
+	}
+	if err := writeField("formname", p.FormName); err != nil {
+		return nil, fmt.Errorf("write formname: %w", err)
+	}
+	if err := mw.WriteField("routecd", p.RouteCode); err != nil {
+		return nil, fmt.Errorf("write routecd: %w", err)
+	}
+	if p.FromDocID != nil {
+		if err := mw.WriteField("fromdocid", strconv.Itoa(*p.FromDocID)); err != nil {
+			return nil, fmt.Errorf("write fromdocid: %w", err)
+		}
+	}
+	if err := writeField("proxy_user", p.ProxyUser); err != nil {
+		return nil, fmt.Errorf("write proxy_user: %w", err)
+	}
+	if err := writeField("datas", p.Datas); err != nil {
+		return nil, fmt.Errorf("write datas: %w", err)
+	}
+	if p.File != nil {
+		h := textproto.MIMEHeader{}
+		h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename=%q`, p.File.Name))
+		h.Set("Content-Type", "application/octet-stream")
+		fw, err := mw.CreatePart(h)
+		if err != nil {
+			return nil, fmt.Errorf("create file part: %w", err)
+		}
+		if _, err := fw.Write(p.File.Content); err != nil {
+			return nil, fmt.Errorf("write file content: %w", err)
+		}
+		if err := mw.WriteField("file_name", p.File.Name); err != nil {
+			return nil, fmt.Errorf("write file_name: %w", err)
+		}
+		if err := writeField("remarks", p.File.Remarks); err != nil {
+			return nil, fmt.Errorf("write remarks: %w", err)
+		}
+		if p.File.DetailNo != nil {
+			if err := mw.WriteField("detail_no", strconv.Itoa(*p.File.DetailNo)); err != nil {
+				return nil, fmt.Errorf("write detail_no: %w", err)
+			}
+		}
+		if p.File.EvidenceType != nil {
+			if err := mw.WriteField("evidence_type", strconv.Itoa(*p.File.EvidenceType)); err != nil {
+				return nil, fmt.Errorf("write evidence_type: %w", err)
+			}
+		}
+	}
+	if err := mw.Close(); err != nil {
+		return nil, fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	_, body, err := c.downloadBytes(ctx, http.MethodPost, "/multiapi/v1/documents/docview", nil, buf.Bytes(), mw.FormDataContentType(), "text/html")
+	return body, err
 }
 
 // parseContentDispositionFilename extracts a filename from a Content-Disposition
