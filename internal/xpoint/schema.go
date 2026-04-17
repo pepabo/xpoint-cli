@@ -2,15 +2,14 @@ package xpoint
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
-
-	"gopkg.in/yaml.v3"
 )
 
-//go:embed schema.yaml
-var schemaYAML []byte
+//go:embed schema.json
+var schemaJSON []byte
 
 var (
 	schemaOnce    sync.Once
@@ -21,19 +20,14 @@ var (
 
 func loadSchema() (map[string]any, []string, error) {
 	schemaOnce.Do(func() {
-		var raw any
-		if err := yaml.Unmarshal(schemaYAML, &raw); err != nil {
-			schemaErr = fmt.Errorf("parse embedded schema.yaml: %w", err)
-			return
-		}
-		root, ok := toStringKeyed(raw).(map[string]any)
-		if !ok {
-			schemaErr = fmt.Errorf("schema.yaml root is not a mapping")
+		var root map[string]any
+		if err := json.Unmarshal(schemaJSON, &root); err != nil {
+			schemaErr = fmt.Errorf("parse embedded schema.json: %w", err)
 			return
 		}
 		ops, ok := root["operations"].(map[string]any)
 		if !ok {
-			schemaErr = fmt.Errorf("schema.yaml is missing `operations` mapping")
+			schemaErr = fmt.Errorf("schema.json is missing `operations` mapping")
 			return
 		}
 		keys := make([]string, 0, len(ops))
@@ -69,31 +63,4 @@ func LookupOperation(alias string) (map[string]any, error) {
 		return nil, fmt.Errorf("unknown schema alias %q (run `xp schema` to list supported aliases)", alias)
 	}
 	return op, nil
-}
-
-// toStringKeyed recursively converts yaml.v3's map[any]any / map[string]any
-// trees into purely JSON-compatible forms with string keys.
-func toStringKeyed(v any) any {
-	switch m := v.(type) {
-	case map[any]any:
-		out := make(map[string]any, len(m))
-		for k, val := range m {
-			out[fmt.Sprint(k)] = toStringKeyed(val)
-		}
-		return out
-	case map[string]any:
-		out := make(map[string]any, len(m))
-		for k, val := range m {
-			out[k] = toStringKeyed(val)
-		}
-		return out
-	case []any:
-		out := make([]any, len(m))
-		for i, val := range m {
-			out[i] = toStringKeyed(val)
-		}
-		return out
-	default:
-		return v
-	}
 }
