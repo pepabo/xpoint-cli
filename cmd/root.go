@@ -53,8 +53,8 @@ func resolveSubdomain() (string, error) {
 	if s := pick(flagSubdomain, "XPOINT_SUBDOMAIN"); s != "" {
 		return s, nil
 	}
-	if s, err := xpoint.LoadDefaultSubdomain(); err == nil && s != "" {
-		return s, nil
+	if t, err := xpoint.LoadToken(); err == nil && t.Subdomain != "" {
+		return t.Subdomain, nil
 	}
 	return "", errors.New("subdomain is required: set --xpoint-subdomain or XPOINT_SUBDOMAIN, or run 'xp auth login' first")
 }

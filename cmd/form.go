@@ -95,18 +95,26 @@ func newClientFromFlags(ctx context.Context) (*xpoint.Client, error) {
 	return xpoint.NewClient(sub, auth), nil
 }
 
-// loadStoredTokenAuth reads the token saved by `xp auth login` for subdomain,
-// refreshing it via the X-point token endpoint when expired. The refreshed
-// token is written back to the keyring so the next call has an up-to-date
-// refresh token (the X-point server invalidates the old refresh token once a
-// refresh succeeds).
+// loadStoredTokenAuth reads the token saved by `xp auth login`, refreshing
+// it via the X-point token endpoint when expired. The refreshed token is
+// written back to the keyring so the next call has an up-to-date refresh
+// token (the X-point server invalidates the old refresh token once a
+// refresh succeeds). subdomain is the target of the outgoing request and
+// must match the stored login; mismatch means the caller asked for a
+// subdomain we have no credentials for.
 func loadStoredTokenAuth(ctx context.Context, subdomain string) (xpoint.Auth, error) {
-	stored, err := xpoint.LoadToken(subdomain)
+	stored, err := xpoint.LoadToken()
 	if err != nil {
 		if errors.Is(err, xpoint.ErrTokenNotFound) {
 			return xpoint.Auth{}, errors.New("authentication is required: set XPOINT_GENERIC_API_TOKEN (with XPOINT_DOMAIN_CODE and XPOINT_USER) or XPOINT_API_ACCESS_TOKEN, or run 'xp auth login'")
 		}
 		return xpoint.Auth{}, err
+	}
+	if stored.Subdomain != subdomain {
+		return xpoint.Auth{}, fmt.Errorf("stored token is for subdomain %q but request targets %q: run 'xp auth login' to re-authenticate", stored.Subdomain, subdomain)
+	}
+	if stored.AccessToken == "" {
+		return xpoint.Auth{}, errors.New("stored token has no access token: run 'xp auth login'")
 	}
 
 	if stored.Expired() && stored.RefreshToken != "" && stored.ClientID != "" {

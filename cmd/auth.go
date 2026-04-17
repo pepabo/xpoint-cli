@@ -105,14 +105,10 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 }
 
 func runAuthStatus(cmd *cobra.Command, args []string) error {
-	sub, err := resolveSubdomain()
-	if err != nil {
-		return err
-	}
-	stored, err := xpoint.LoadToken(sub)
+	stored, err := xpoint.LoadToken()
 	if err != nil {
 		if errors.Is(err, xpoint.ErrTokenNotFound) {
-			fmt.Fprintf(os.Stdout, "subdomain: %s\nstatus:    not logged in (run 'xp auth login')\n", sub)
+			fmt.Fprintf(os.Stdout, "status: not logged in (run 'xp auth login')\n")
 			return nil
 		}
 		return err
