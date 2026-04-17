@@ -41,6 +41,8 @@ func TestAliases_Sorted(t *testing.T) {
 		"service",
 		"system.form.list",
 		"system.form.show",
+		"system.lumpapply.list",
+		"system.lumpapply.show",
 		"system.master.data",
 		"system.master.import",
 		"system.master.list",
