@@ -364,6 +364,9 @@ func TestGetSelfInfo(t *testing.T) {
 		if r.URL.Path != "/scim/v2/acme/Me" {
 			t.Errorf("path = %s", r.URL.Path)
 		}
+		if got := r.Header.Get("Accept"); got != "application/scim+json" {
+			t.Errorf("Accept = %q, want application/scim+json", got)
+		}
 		w.Header().Set("Content-Type", "application/scim+json")
 		_, _ = w.Write([]byte(`{"id":"100","userName":"u001","displayName":"田中"}`))
 	}))

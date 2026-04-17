@@ -369,7 +369,7 @@ func (c *Client) GetSelfInfo(ctx context.Context, domainCode string) (*SelfInfo,
 	}
 	path := fmt.Sprintf("/scim/v2/%s/Me", url.PathEscape(domainCode))
 	var out SelfInfo
-	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+	if err := c.doAccept(ctx, http.MethodGet, path, nil, nil, "application/scim+json", &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -433,6 +433,12 @@ func parseContentDispositionFilename(cd string) string {
 
 // do executes an HTTP request and decodes a JSON response into out.
 func (c *Client) do(ctx context.Context, method, path string, q url.Values, body []byte, out any) error {
+	return c.doAccept(ctx, method, path, q, body, "application/json", out)
+}
+
+// doAccept is like do but lets the caller specify the Accept header value.
+// SCIM endpoints, for instance, require "application/scim+json".
+func (c *Client) doAccept(ctx context.Context, method, path string, q url.Values, body []byte, accept string, out any) error {
 	u := c.baseURL + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
@@ -448,7 +454,9 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 		return err
 	}
 	c.auth.apply(req)
-	req.Header.Set("Accept", "application/json")
+	if accept != "" {
+		req.Header.Set("Accept", accept)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
