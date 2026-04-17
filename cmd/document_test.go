@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -383,6 +384,401 @@ func TestRunDocumentEdit_InvalidDocID(t *testing.T) {
 	err := runDocumentEdit(documentEditCmd, []string{"not-a-number"})
 	if err == nil || !strings.Contains(err.Error(), "invalid docid") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func TestParseDocumentStatus_PopulatesFields(t *testing.T) {
+	raw := json.RawMessage(`{
+		"document": {
+			"docid": 12345,
+			"title1": "経費申請 2024-01",
+			"form": {"id": 99, "code": "form01", "name": "経費申請書"},
+			"route": {"code": "r1", "name": "標準ルート"},
+			"type": "workflow",
+			"status": {"code": 1, "name": "承認中"},
+			"step": {"max": 5, "current": 2},
+			"current_version": 3,
+			"writer": {"usercode": "u001", "username": "山田太郎", "datetime": "2024-01-15 10:00:00"},
+			"lastaprv": {"usercode": "u002", "username": "佐藤花子", "datetime": "2024-01-16 11:00:00"},
+			"flow_versions": [
+				{
+					"flow_results": [
+						{"stepno": 1, "steptitle": "申請", "aprvusers": [
+							{"aprv": {"usercode": "u001", "username": "山田太郎", "datetime": "2024-01-15 10:00:00"}, "statuscode": 0, "status": "申請"}
+						]},
+						{"stepno": 2, "steptitle": "一次承認", "aprvusers": [
+							{"aprv": {"usercode": "u002", "username": "佐藤花子", "datetime": "2024-01-16 11:00:00"}, "statuscode": 1, "status": "承認"}
+						]}
+					]
+				}
+			]
+		}
+	}`)
+
+	view, err := parseDocumentStatus(raw)
+	if err != nil {
+		t.Fatalf("parseDocumentStatus: %v", err)
+	}
+	d := view.Document
+	if d.DocID != 12345 {
+		t.Errorf("docid = %d", d.DocID)
+	}
+	if d.Form.Code != "form01" || d.Form.Name != "経費申請書" {
+		t.Errorf("form = %+v", d.Form)
+	}
+	if d.Status.Code != 1 || d.Status.Name != "承認中" {
+		t.Errorf("status = %+v", d.Status)
+	}
+	if d.Step.Current != 2 || d.Step.Max != 5 {
+		t.Errorf("step = %+v", d.Step)
+	}
+	if len(d.FlowVersions) != 1 || len(d.FlowVersions[0].FlowResults) != 2 {
+		t.Fatalf("flow_versions = %+v", d.FlowVersions)
+	}
+	first := d.FlowVersions[0].FlowResults[1]
+	if first.StepTitle != "一次承認" || len(first.AprvUsers) != 1 {
+		t.Errorf("flow[1] = %+v", first)
+	}
+	if first.AprvUsers[0].Aprv.UserName != "佐藤花子" {
+		t.Errorf("approver = %+v", first.AprvUsers[0])
+	}
+}
+
+func TestPrintDocumentStatusTable_IncludesMetaAndFlow(t *testing.T) {
+	view := &documentStatusView{
+		Document: documentStatusDocument{
+			DocID:          12345,
+			Title1:         "経費申請",
+			Form:           documentStatusForm{ID: 99, Code: "form01", Name: "経費申請書"},
+			Route:          documentStatusRoute{Code: "r1", Name: "標準ルート"},
+			Type:           "workflow",
+			Status:         documentStatusState{Code: 1, Name: "承認中"},
+			Step:           documentStatusStep{Max: 5, Current: 2},
+			CurrentVersion: 3,
+			Writer: documentStatusUser{
+				UserCode: "u001", UserName: "山田太郎",
+				DateTime: "2024-01-15 10:00:00",
+			},
+			LastAprv: documentStatusUser{
+				UserCode: "u002", UserName: "佐藤花子",
+				DateTime: "2024-01-16 11:00:00",
+			},
+			FlowVersions: []documentStatusFlowVer{
+				{FlowResults: []documentStatusFlowStep{
+					{StepNo: 1, StepTitle: "申請", AprvUsers: []documentStatusAprvUser{
+						{Aprv: documentStatusAprvDetail{UserCode: "u001", UserName: "山田太郎", DateTime: "2024-01-15 10:00:00"}, Status: "申請"},
+					}},
+					{StepNo: 2, StepTitle: "一次承認", AprvUsers: []documentStatusAprvUser{
+						{Aprv: documentStatusAprvDetail{UserCode: "u002", UserName: "佐藤花子"}, Status: "未処理"},
+						{Aprv: documentStatusAprvDetail{UserCode: "u003", UserName: "鈴木次郎"}, Status: "未処理"},
+					}},
+				}},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	printDocumentStatusTable(&buf, view)
+	out := buf.String()
+
+	for _, want := range []string{
+		"DOCID:", "12345",
+		"TITLE1:", "経費申請",
+		"FORM:", "経費申請書",
+		"ROUTE:", "標準ルート",
+		"STATUS:", "承認中",
+		"STEP:", "2/5",
+		"WRITER:", "山田太郎", "2024-01-15 10:00:00",
+		"LASTAPRV:", "佐藤花子",
+		"承認フロー:",
+		"STEP", "TITLE", "USER", "STATUS", "DATETIME",
+		"申請", "一次承認",
+		"山田太郎", "佐藤花子", "鈴木次郎",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
+	}
+	// TYPE / VERSION should no longer be rendered.
+	for _, unwant := range []string{"TYPE:", "VERSION:"} {
+		if strings.Contains(out, unwant) {
+			t.Errorf("unwanted label %q present in output:\n%s", unwant, out)
+		}
+	}
+	// FORM should not display the form code (only the name).
+	if strings.Contains(out, "form01") {
+		t.Errorf("FORM line should not include the form code, got:\n%s", out)
+	}
+	// STATUS should not include the numeric status code.
+	if strings.Contains(out, "(1)") {
+		t.Errorf("STATUS line should not include numeric code, got:\n%s", out)
+	}
+	// Neither the flow table USER column nor WRITER/LASTAPRV should include
+	// the parenthesized user code.
+	for _, unwant := range []string{"(u001)", "(u002)", "(u003)"} {
+		if strings.Contains(out, unwant) {
+			t.Errorf("user code %q should not appear anywhere in output:\n%s", unwant, out)
+		}
+	}
+	// Current step (2) should be marked with "*2"; non-current step (1)
+	// gets a leading space " 1" to keep numbers column-aligned.
+	if !strings.Contains(out, "*2") {
+		t.Errorf("current step marker \"*2\" missing:\n%s", out)
+	}
+	if !strings.Contains(out, " 1") {
+		t.Errorf("non-current step \" 1\" missing:\n%s", out)
+	}
+	// Trailing 承認完了 row should be appended.
+	if !strings.Contains(out, "承認完了") {
+		t.Errorf("trailing 承認完了 row missing:\n%s", out)
+	}
+	// The second approver row should have blank STEP/TITLE because it
+	// shares the step with the first approver.
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	var suzukiLine string
+	for _, l := range lines {
+		if strings.Contains(l, "鈴木次郎") {
+			suzukiLine = l
+			break
+		}
+	}
+	if suzukiLine == "" {
+		t.Fatalf("鈴木次郎 row missing in output:\n%s", out)
+	}
+	if strings.Contains(suzukiLine, "一次承認") || strings.Contains(suzukiLine, "*2") {
+		t.Errorf("grouped row should have blank STEP/TITLE, got: %q", suzukiLine)
+	}
+}
+
+func TestBuildCompletionRow_CompletedShowsLastAprv(t *testing.T) {
+	d := documentStatusDocument{
+		Status: documentStatusState{Code: 6, Name: "承認完了"},
+		LastAprv: documentStatusUser{
+			UserCode: "u9", UserName: "承認太郎",
+			DateTime: "2024-02-01 09:00:00",
+		},
+	}
+	r := buildCompletionRow(d)
+	if r == nil {
+		t.Fatal("completion row = nil, want populated row")
+	}
+	if r.user != "承認太郎" {
+		t.Errorf("user = %q", r.user)
+	}
+	if r.status != "承認完了" {
+		t.Errorf("status = %q", r.status)
+	}
+	if r.datetime != "2024-02-01 09:00:00" {
+		t.Errorf("datetime = %q", r.datetime)
+	}
+	if !r.current {
+		t.Errorf("current = false, want true for 承認完了")
+	}
+}
+
+func TestBuildCompletionRow_NotCompletedShowsDashes(t *testing.T) {
+	d := documentStatusDocument{
+		Status:   documentStatusState{Code: 1, Name: "承認中"},
+		LastAprv: documentStatusUser{},
+	}
+	r := buildCompletionRow(d)
+	if r == nil {
+		t.Fatal("completion row = nil")
+	}
+	if r.user != "-" || r.status != "-" || r.datetime != "-" {
+		t.Errorf("row = %+v, want all dashes", r)
+	}
+	if r.current {
+		t.Errorf("current = true, want false for non-completed")
+	}
+}
+
+func TestFlowCurrentStepNo_SuppressedWhenCompleted(t *testing.T) {
+	d := documentStatusDocument{
+		Status: documentStatusState{Code: 6, Name: "承認完了"},
+		Step:   documentStatusStep{Max: 3, Current: 3},
+	}
+	if got := flowCurrentStepNo(d); got != 0 {
+		t.Errorf("completed doc: got %d, want 0", got)
+	}
+}
+
+func TestFlowCurrentStepNo_UsesStepCurrent(t *testing.T) {
+	d := documentStatusDocument{
+		Status: documentStatusState{Code: 1, Name: "承認中"},
+		Step:   documentStatusStep{Max: 3, Current: 2},
+	}
+	if got := flowCurrentStepNo(d); got != 2 {
+		t.Errorf("pending doc: got %d, want 2", got)
+	}
+}
+
+func TestPrintDocumentStatusTable_CompletedMarksFinalRow(t *testing.T) {
+	view := &documentStatusView{
+		Document: documentStatusDocument{
+			DocID:  42,
+			Form:   documentStatusForm{Code: "f", Name: "F"},
+			Status: documentStatusState{Code: 6, Name: "承認完了"},
+			Step:   documentStatusStep{Max: 3, Current: 3},
+			LastAprv: documentStatusUser{
+				UserCode: "u9", UserName: "承認太郎",
+				DateTime: "2024-02-01 09:00:00",
+			},
+			FlowVersions: []documentStatusFlowVer{
+				{FlowResults: []documentStatusFlowStep{
+					{StepNo: 1, StepTitle: "申請", AprvUsers: []documentStatusAprvUser{
+						{Aprv: documentStatusAprvDetail{UserCode: "u1", UserName: "A"}, Status: "申請"},
+					}},
+					{StepNo: 3, StepTitle: "最終承認", AprvUsers: []documentStatusAprvUser{
+						{Aprv: documentStatusAprvDetail{UserCode: "u9", UserName: "承認太郎"}, Status: "承認"},
+					}},
+				}},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	printDocumentStatusTable(&buf, view)
+	out := buf.String()
+
+	if !strings.Contains(out, "*4") {
+		t.Errorf("承認完了 row should carry \"*4\" marker (last+1), got:\n%s", out)
+	}
+	// The real last step (3) should NOT be starred when the doc is completed.
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	var lastStepLine string
+	for _, l := range lines {
+		if strings.Contains(l, "最終承認") {
+			lastStepLine = l
+			break
+		}
+	}
+	if lastStepLine == "" {
+		t.Fatalf("最終承認 row missing:\n%s", out)
+	}
+	if strings.Contains(lastStepLine, "*3") {
+		t.Errorf("real step row should not be starred when completed, got: %q", lastStepLine)
+	}
+	if !strings.Contains(lastStepLine, " 3") {
+		t.Errorf("real step row should have \" 3\" prefix, got: %q", lastStepLine)
+	}
+}
+
+func TestFormatFlowStepNo_StarAndSpacePrefix(t *testing.T) {
+	if got := formatFlowStepNo(2, 2); got != "*2" {
+		t.Errorf("current step: got %q, want \"*2\"", got)
+	}
+	if got := formatFlowStepNo(1, 2); got != " 1" {
+		t.Errorf("non-current step: got %q, want \" 1\"", got)
+	}
+	if got := formatFlowStepNo(3, 0); got != " 3" {
+		t.Errorf("currentStepNo=0: got %q, want \" 3\"", got)
+	}
+}
+
+func TestPrintDocumentStatusTable_IncludesHistories(t *testing.T) {
+	view := &documentStatusView{
+		Document: documentStatusDocument{
+			DocID:  42,
+			Form:   documentStatusForm{Code: "f", Name: "F"},
+			Status: documentStatusState{Code: 6, Name: "承認完了"},
+			Step:   documentStatusStep{Max: 2, Current: 2},
+			Histories: []documentStatusHistory{
+				{Version: 1, FlowResults: []documentStatusFlowStep{
+					{StepNo: 1, StepTitle: "申請", AprvUsers: []documentStatusAprvUser{
+						{Aprv: documentStatusAprvDetail{UserCode: "u1", UserName: "A"}, Status: "申請"},
+					}},
+				}},
+				{Version: 2, FlowResults: []documentStatusFlowStep{
+					{StepNo: 1, StepTitle: "申請", AprvUsers: []documentStatusAprvUser{
+						{Aprv: documentStatusAprvDetail{UserCode: "u1", UserName: "A"}, Status: "申請"},
+					}},
+				}},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	printDocumentStatusTable(&buf, view)
+	out := buf.String()
+
+	for _, want := range []string{
+		"承認履歴 (version 1):",
+		"承認履歴 (version 2):",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
+	}
+}
+
+func TestParseDocumentStatus_AcceptsStringNumbers(t *testing.T) {
+	// Some X-point endpoints return integer-valued fields as JSON strings.
+	raw := json.RawMessage(`{
+		"document": {
+			"docid": "265941",
+			"form": {"id": "99", "code": "f", "name": "F"},
+			"status": {"code": "1", "name": "承認中"},
+			"step": {"max": "3", "current": "2"},
+			"current_version": "4",
+			"flow_versions": [
+				{"flow_results": [
+					{"stepno": "1", "steptitle": "申請", "aprvusers": [
+						{"aprv": {"usercode": "u1", "username": "A"}, "statuscode": "0", "status": "申請"}
+					]}
+				]}
+			],
+			"histories": [
+				{"version": "1", "flow_results": []}
+			]
+		}
+	}`)
+
+	view, err := parseDocumentStatus(raw)
+	if err != nil {
+		t.Fatalf("parseDocumentStatus: %v", err)
+	}
+	d := view.Document
+	if d.DocID != 265941 {
+		t.Errorf("docid = %d", d.DocID)
+	}
+	if d.Status.Code != 1 {
+		t.Errorf("status.code = %d", d.Status.Code)
+	}
+	if d.Step.Current != 2 || d.Step.Max != 3 {
+		t.Errorf("step = %+v", d.Step)
+	}
+	if d.CurrentVersion != 4 {
+		t.Errorf("current_version = %d", d.CurrentVersion)
+	}
+	if len(d.FlowVersions) != 1 || d.FlowVersions[0].FlowResults[0].StepNo != 1 {
+		t.Errorf("flow_versions = %+v", d.FlowVersions)
+	}
+	if d.Histories[0].Version != 1 {
+		t.Errorf("histories[0].version = %d", d.Histories[0].Version)
+	}
+}
+
+func TestFlexInt_EmptyStringBecomesZero(t *testing.T) {
+	var v struct {
+		X flexInt `json:"x"`
+	}
+	if err := json.Unmarshal([]byte(`{"x":""}`), &v); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if v.X != 0 {
+		t.Errorf("x = %d, want 0", v.X)
+	}
+}
+
+func TestFormatRawJSONIndent_PrettyPrints(t *testing.T) {
+	raw := json.RawMessage(`{"a":1,"b":[1,2]}`)
+	got := string(formatRawJSONIndent(raw))
+	if !strings.Contains(got, "\n  \"a\": 1") {
+		t.Errorf("not indented: %q", got)
+	}
+	if !strings.HasSuffix(got, "\n") {
+		t.Errorf("missing trailing newline: %q", got)
 	}
 }
 

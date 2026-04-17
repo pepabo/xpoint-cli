@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -50,6 +51,7 @@ var (
 	docDownloadOutput string
 
 	docStatusHistory bool
+	docStatusOutput  string
 	docStatusJQ      string
 
 	docOpenNoBrowser bool
@@ -187,9 +189,10 @@ var documentStatusCmd = &cobra.Command{
 	Short: "Get document approval status",
 	Long: `Retrieve the approval status of a document via GET /api/v1/documents/{docid}/status.
 
-The response is returned as JSON and contains the current status, step,
-writer, last approver, and the approval flow. Pass --history to include
-approval histories for all past versions.`,
+The response contains the current status, step, writer, last approver, and
+the approval flow. On a TTY, a human-readable summary is printed by default;
+otherwise raw JSON is emitted. Pass --output json/table to force a format.
+Pass --history to include approval histories for all past versions.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runDocumentStatus,
 }
@@ -375,7 +378,8 @@ func init() {
 
 	sf := documentStatusCmd.Flags()
 	sf.BoolVar(&docStatusHistory, "history", false, "include approval histories for all versions")
-	sf.StringVar(&docStatusJQ, "jq", "", "apply a gojq filter to the JSON response")
+	sf.StringVarP(&docStatusOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	sf.StringVar(&docStatusJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
 
 	dlf := documentDownloadCmd.Flags()
 	dlf.StringVarP(&docDownloadOutput, "output", "o", "", "output path: FILE, DIR/, or - for stdout (default: server-provided filename in current directory)")
@@ -630,10 +634,386 @@ func runDocumentStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if docStatusJQ != "" {
-		return runJQ(raw, docStatusJQ)
+
+	format := resolveOutputFormat(docStatusOutput)
+	if docStatusJQ == "" && format == "json" {
+		// Preserve the exact server JSON (without re-marshaling the struct),
+		// matching the prior behavior when stdout is not a TTY.
+		_, err := os.Stdout.Write(formatRawJSONIndent(raw))
+		return err
 	}
-	return writeJSON(os.Stdout, raw)
+
+	view, err := parseDocumentStatus(raw)
+	if err != nil {
+		return err
+	}
+
+	return render(view, format, docStatusJQ, func() error {
+		printDocumentStatusTable(os.Stdout, view)
+		return nil
+	})
+}
+
+type documentStatusView struct {
+	Document documentStatusDocument `json:"document"`
+}
+
+type documentStatusDocument struct {
+	DocID          flexInt                 `json:"docid"`
+	Title1         string                  `json:"title1"`
+	Title2         string                  `json:"title2"`
+	Form           documentStatusForm      `json:"form"`
+	Route          documentStatusRoute     `json:"route"`
+	Type           string                  `json:"type"`
+	Status         documentStatusState     `json:"status"`
+	Step           documentStatusStep      `json:"step"`
+	CurrentVersion flexInt                 `json:"current_version"`
+	Writer         documentStatusUser      `json:"writer"`
+	LastAprv       documentStatusUser      `json:"lastaprv"`
+	FlowVersions   []documentStatusFlowVer `json:"flow_versions"`
+	Histories      []documentStatusHistory `json:"histories"`
+}
+
+type documentStatusForm struct {
+	ID   flexInt `json:"id"`
+	Code string  `json:"code"`
+	Name string  `json:"name"`
+}
+
+type documentStatusRoute struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+type documentStatusState struct {
+	Code flexInt `json:"code"`
+	Name string  `json:"name"`
+}
+
+type documentStatusStep struct {
+	Max     flexInt `json:"max"`
+	Current flexInt `json:"current"`
+}
+
+// flexInt decodes JSON numbers that may arrive as either an integer or a
+// string (some X-point endpoints return integer-valued fields as strings).
+type flexInt int
+
+func (f *flexInt) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 || string(b) == "null" {
+		*f = 0
+		return nil
+	}
+	// Numeric form.
+	if b[0] != '"' {
+		var n int
+		if err := json.Unmarshal(b, &n); err != nil {
+			return err
+		}
+		*f = flexInt(n)
+		return nil
+	}
+	// String form — tolerate empty/whitespace.
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		*f = 0
+		return nil
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return fmt.Errorf("flexInt: %w", err)
+	}
+	*f = flexInt(n)
+	return nil
+}
+
+type documentStatusUser struct {
+	UserCode  string `json:"usercode"`
+	UserName  string `json:"username"`
+	StampName string `json:"stampname"`
+	DateTime  string `json:"datetime"`
+}
+
+type documentStatusFlowVer struct {
+	FlowResults []documentStatusFlowStep `json:"flow_results"`
+}
+
+type documentStatusHistory struct {
+	Version     flexInt                  `json:"version"`
+	FlowResults []documentStatusFlowStep `json:"flow_results"`
+}
+
+type documentStatusFlowStep struct {
+	StepNo     flexInt                  `json:"stepno"`
+	StepTitle  string                   `json:"steptitle"`
+	AprvUsers  []documentStatusAprvUser `json:"aprvusers"`
+	Cond       string                   `json:"cond"`
+	CondNum    flexInt                  `json:"cond_num"`
+	AdminSkip  flexInt                  `json:"adminskip"`
+	Skip       flexInt                  `json:"skip"`
+	BackStepNo flexInt                  `json:"backstepno"`
+}
+
+type documentStatusAprvUser struct {
+	Aprv       documentStatusAprvDetail `json:"aprv"`
+	StatusCode flexInt                  `json:"statuscode"`
+	Status     string                   `json:"status"`
+}
+
+type documentStatusAprvDetail struct {
+	UserCode  string `json:"usercode"`
+	UserName  string `json:"username"`
+	StampName string `json:"stampname"`
+	DateTime  string `json:"datetime"`
+	GroupCD   string `json:"groupcd"`
+	GroupName string `json:"groupname"`
+	PartCD    string `json:"partcd"`
+	PartName  string `json:"partname"`
+}
+
+func parseDocumentStatus(raw json.RawMessage) (*documentStatusView, error) {
+	var view documentStatusView
+	if err := json.Unmarshal(raw, &view); err != nil {
+		return nil, fmt.Errorf("parse status response: %w", err)
+	}
+	return &view, nil
+}
+
+func formatRawJSONIndent(raw json.RawMessage) []byte {
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, raw, "", "  "); err != nil {
+		// Fall back to the raw bytes if they cannot be re-indented.
+		buf.Reset()
+		buf.Write(raw)
+	}
+	buf.WriteByte('\n')
+	return buf.Bytes()
+}
+
+func printDocumentStatusTable(out io.Writer, view *documentStatusView) {
+	d := view.Document
+	list := newList(out)
+	list.AddRow("DOCID:", fmt.Sprint(d.DocID))
+	list.AddRow("TITLE1:", dashIfEmpty(d.Title1))
+	if d.Title2 != "" {
+		list.AddRow("TITLE2:", d.Title2)
+	}
+	list.AddRow("FORM:", formatFormRef(d.Form))
+	if d.Route.Code != "" || d.Route.Name != "" {
+		list.AddRow("ROUTE:", formatRouteRef(d.Route))
+	}
+	list.AddRow("STATUS:", formatStatusState(d.Status))
+	list.AddRow("STEP:", formatStepInfo(d.Step))
+	list.AddRow("WRITER:", formatUserStamp(d.Writer))
+	if d.LastAprv.UserCode != "" || d.LastAprv.UserName != "" || d.LastAprv.DateTime != "" {
+		list.AddRow("LASTAPRV:", formatUserStamp(d.LastAprv))
+	}
+	list.Print()
+
+	for i, fv := range d.FlowVersions {
+		if len(fv.FlowResults) == 0 {
+			continue
+		}
+		fmt.Fprintln(out)
+		if len(d.FlowVersions) == 1 {
+			fmt.Fprintln(out, "承認フロー:")
+		} else {
+			fmt.Fprintf(out, "承認フロー (flow_versions[%d]):\n", i)
+		}
+		printFlowResultsTable(out, fv.FlowResults, flowCurrentStepNo(d), buildCompletionRow(d))
+	}
+
+	for _, h := range d.Histories {
+		fmt.Fprintln(out)
+		fmt.Fprintf(out, "承認履歴 (version %d):\n", h.Version)
+		if len(h.FlowResults) == 0 {
+			fmt.Fprintln(out, "  (no steps)")
+			continue
+		}
+		printFlowResultsTable(out, h.FlowResults, 0, nil)
+	}
+}
+
+type flowCompletionRow struct {
+	user, status, datetime string
+	current                bool
+}
+
+// buildCompletionRow returns the trailing "承認完了" row for the current
+// version's approval flow. When the document is actually completed (status
+// code 6), the last approver's name/datetime are filled in and current is
+// true so the row carries the "*" marker; otherwise each cell is a dash so
+// the row still anchors the end of the flow.
+func buildCompletionRow(d documentStatusDocument) *flowCompletionRow {
+	if int(d.Status.Code) == 6 {
+		name := d.LastAprv.UserName
+		if name == "" {
+			name = d.LastAprv.StampName
+		}
+		return &flowCompletionRow{
+			user:     dashIfEmpty(name),
+			status:   dashIfEmpty(d.Status.Name),
+			datetime: dashIfEmpty(d.LastAprv.DateTime),
+			current:  true,
+		}
+	}
+	return &flowCompletionRow{user: "-", status: "-", datetime: "-"}
+}
+
+// flowCurrentStepNo picks the step number that carries the "*" marker.
+// For a completed document the marker belongs on the trailing 承認完了 row,
+// so we return 0 here to suppress it on every real step.
+func flowCurrentStepNo(d documentStatusDocument) int {
+	if int(d.Status.Code) == 6 {
+		return 0
+	}
+	return int(d.Step.Current)
+}
+
+// printFlowResultsTable prints the approval flow as a table. When
+// currentStepNo > 0, the matching step number is marked with "*" so the
+// reader can spot the pending step at a glance. Consecutive rows sharing
+// the same STEP/TITLE collapse those two cells so each step reads as one
+// group with multiple approvers underneath. When completion is non-nil a
+// trailing "承認完了" row is appended.
+func printFlowResultsTable(out io.Writer, steps []documentStatusFlowStep, currentStepNo int, completion *flowCompletionRow) {
+	w := newTable(out, "STEP", "TITLE", "USER", "STATUS", "DATETIME")
+	prevStep, prevTitle := "", ""
+	emit := func(step, title, user, status, datetime string) {
+		stepOut, titleOut := step, title
+		if step == prevStep && title == prevTitle {
+			stepOut, titleOut = "", ""
+		} else {
+			prevStep, prevTitle = step, title
+		}
+		w.AddRow(stepOut, titleOut, user, status, datetime)
+	}
+	for _, s := range steps {
+		step := formatFlowStepNo(int(s.StepNo), currentStepNo)
+		title := dashIfEmpty(s.StepTitle)
+		if len(s.AprvUsers) == 0 {
+			emit(step, title, "-", "-", "-")
+			continue
+		}
+		for _, u := range s.AprvUsers {
+			emit(step, title,
+				formatAprvUser(u.Aprv),
+				dashIfEmpty(u.Status),
+				dashIfEmpty(u.Aprv.DateTime),
+			)
+		}
+	}
+	if completion != nil {
+		completionStepNo := 0
+		if len(steps) > 0 {
+			completionStepNo = int(steps[len(steps)-1].StepNo) + 1
+		}
+		var stepStr string
+		if completionStepNo == 0 {
+			stepStr = ""
+		} else if completion.current {
+			stepStr = "*" + strconv.Itoa(completionStepNo)
+		} else {
+			stepStr = " " + strconv.Itoa(completionStepNo)
+		}
+		emit(stepStr, "承認完了", completion.user, completion.status, completion.datetime)
+	}
+	w.Print()
+}
+
+// formatFlowStepNo renders the STEP column. The current step is prefixed
+// with "*"; other steps get a leading space so numbers stay column-aligned
+// (e.g. "*1" next to " 2").
+func formatFlowStepNo(stepno, currentStepNo int) string {
+	if currentStepNo > 0 && stepno == currentStepNo {
+		return "*" + strconv.Itoa(stepno)
+	}
+	return " " + strconv.Itoa(stepno)
+}
+
+func formatFormRef(f documentStatusForm) string {
+	switch {
+	case f.Name != "":
+		return f.Name
+	case f.Code != "":
+		return f.Code
+	default:
+		return "-"
+	}
+}
+
+func formatRouteRef(r documentStatusRoute) string {
+	switch {
+	case r.Code != "" && r.Name != "":
+		return fmt.Sprintf("%s  %s", r.Code, r.Name)
+	case r.Name != "":
+		return r.Name
+	case r.Code != "":
+		return r.Code
+	default:
+		return "-"
+	}
+}
+
+func formatStatusState(s documentStatusState) string {
+	if s.Name != "" {
+		return s.Name
+	}
+	if s.Code != 0 {
+		return strconv.Itoa(int(s.Code))
+	}
+	return "-"
+}
+
+func formatStepInfo(s documentStatusStep) string {
+	if s.Max == 0 && s.Current == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("%d/%d", s.Current, s.Max)
+}
+
+func formatUserStamp(u documentStatusUser) string {
+	name := u.UserName
+	if name == "" {
+		name = u.StampName
+	}
+	if name == "" {
+		name = u.UserCode
+	}
+	switch {
+	case name != "" && u.DateTime != "":
+		return fmt.Sprintf("%s  %s", name, u.DateTime)
+	case name != "":
+		return name
+	case u.DateTime != "":
+		return u.DateTime
+	default:
+		return "-"
+	}
+}
+
+func formatAprvUser(a documentStatusAprvDetail) string {
+	switch {
+	case a.UserName != "":
+		return a.UserName
+	case a.StampName != "":
+		return a.StampName
+	case a.UserCode != "":
+		return a.UserCode
+	default:
+		return "-"
+	}
+}
+
+func dashIfEmpty(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
 }
 
 func runDocumentDownload(cmd *cobra.Command, args []string) error {
