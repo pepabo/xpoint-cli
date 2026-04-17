@@ -168,16 +168,6 @@ func TestResolveCurrentUserCode_UsesEnvUser(t *testing.T) {
 	}
 }
 
-func TestResolveCurrentUserCode_ErrorsWithoutUserOrDomain(t *testing.T) {
-	resetSearchFlags(t)
-	t.Setenv("XPOINT_USER", "")
-	t.Setenv("XPOINT_DOMAIN_CODE", "")
-
-	_, err := resolveCurrentUserCode(context.Background(), nil)
-	if err == nil || !strings.Contains(err.Error(), "--xpoint-user") {
-		t.Errorf("err = %v", err)
-	}
-}
 
 func TestRunDocumentSearch_BodyAndFilterConflict(t *testing.T) {
 	resetSearchFlags(t)

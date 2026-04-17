@@ -476,9 +476,9 @@ func resolveCurrentUserCode(ctx context.Context, client *xpoint.Client) (string,
 	if u := pick(flagUser, "XPOINT_USER"); u != "" {
 		return u, nil
 	}
-	domain := pick(flagDomainCode, "XPOINT_DOMAIN_CODE")
+	domain := resolveDomainCode()
 	if domain == "" {
-		return "", fmt.Errorf("--me requires the current user code: set --xpoint-user / XPOINT_USER, or --xpoint-domain-code / XPOINT_DOMAIN_CODE to look it up via /scim/v2/{domain_code}/Me")
+		return "", fmt.Errorf("--me requires the current user code: set --xpoint-user / XPOINT_USER, or provide a domain code (--xpoint-domain-code / XPOINT_DOMAIN_CODE / stored OAuth login) to look it up via /scim/v2/{domain_code}/Me")
 	}
 	info, err := client.GetSelfInfo(ctx, domain)
 	if err != nil {
