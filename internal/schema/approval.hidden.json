@@ -1,0 +1,47 @@
+{
+  "method": "PUT",
+  "path": "/api/v1/approvals/hidden",
+  "summary": "承認完了書類非表示設定",
+  "description": "承認完了書類の表示／非表示フラグをまとめて切り替える。承認待ち一覧取得APIで取得した docid を指定すること。承認完了以外の書類を指定するとエラー応答となる。",
+  "requestBody": {
+    "type": "object",
+    "required": ["hidden", "docid"],
+    "properties": {
+      "hidden": {
+        "type": "boolean",
+        "description": "true: 指定書類を非表示 / false: 指定書類を表示"
+      },
+      "docid": {
+        "type": "array",
+        "description": "対象の書類ID配列 (承認完了書類のみ有効)",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "proxy_user": {
+        "type": "string",
+        "description": "代理承認者ユーザCD (代理承認した承認完了書類を対象にするとき指定)"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "docid": {
+        "type": "array",
+        "description": "非表示／表示設定した書類ID配列",
+        "items": {
+          "type": "integer"
+        }
+      },
+      "message_type": {
+        "type": "integer",
+        "description": "メッセージタイプ (3:INFO 固定)"
+      },
+      "message": {
+        "type": "string",
+        "description": "メッセージ内容"
+      }
+    }
+  }
+}

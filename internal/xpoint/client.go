@@ -221,6 +221,81 @@ func (c *Client) ListApprovals(ctx context.Context, p ApprovalsListParams) (*App
 	return &out, nil
 }
 
+type ApprovalsWaitStatus struct {
+	Type  int    `json:"type"`
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type ApprovalsWaitItem struct {
+	DocID      int    `json:"docid"`
+	Name       string `json:"name"`
+	Title      string `json:"title"`
+	WriterName string `json:"writername"`
+	WriteDate  string `json:"writedate"`
+}
+
+type ApprovalsWaitResponse struct {
+	StatusList []ApprovalsWaitStatus `json:"status_list"`
+	WaitList   []ApprovalsWaitItem   `json:"wait_list"`
+}
+
+// ApprovalsWaitParams holds query parameters for GET /api/v1/approvals/wait.
+type ApprovalsWaitParams struct {
+	FormGroupID *int
+	FormID      *int
+	Step        *int
+}
+
+func (p ApprovalsWaitParams) query() url.Values {
+	v := url.Values{}
+	if p.FormGroupID != nil {
+		v.Set("fgid", strconv.Itoa(*p.FormGroupID))
+	}
+	if p.FormID != nil {
+		v.Set("fid", strconv.Itoa(*p.FormID))
+	}
+	if p.Step != nil {
+		v.Set("step", strconv.Itoa(*p.Step))
+	}
+	return v
+}
+
+// GetApprovalsWait calls GET /api/v1/approvals/wait.
+func (c *Client) GetApprovalsWait(ctx context.Context, p ApprovalsWaitParams) (*ApprovalsWaitResponse, error) {
+	var out ApprovalsWaitResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/approvals/wait", p.query(), nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SetApprovalsHiddenRequest is the PUT /api/v1/approvals/hidden body.
+type SetApprovalsHiddenRequest struct {
+	Hidden    bool   `json:"hidden"`
+	DocID     []int  `json:"docid"`
+	ProxyUser string `json:"proxy_user,omitempty"`
+}
+
+type SetApprovalsHiddenResponse struct {
+	DocID       []int  `json:"docid"`
+	MessageType int    `json:"message_type"`
+	Message     string `json:"message"`
+}
+
+// SetApprovalsHidden calls PUT /api/v1/approvals/hidden.
+func (c *Client) SetApprovalsHidden(ctx context.Context, req SetApprovalsHiddenRequest) (*SetApprovalsHiddenResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+	var out SetApprovalsHiddenResponse
+	if err := c.do(ctx, http.MethodPut, "/api/v1/approvals/hidden", nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 type SearchForm struct {
 	ID   int    `json:"id"`
 	Code string `json:"code"`
