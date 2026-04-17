@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -75,7 +76,8 @@ Filter flags build a search body automatically:
   --form-group-id <n>      form group ID (fgid)
   --writer <code>          writer user code (repeatable)
   --writer-group <code>    writer user-group code (repeatable)
-  --me                     shorthand for --writer <current user code>
+  --me                     shorthand for --writer <current user code>;
+                           looked up via XPOINT_USER or /scim/v2/{domain_code}/Me
   --since <YYYY-MM-DD>     lower bound of 新規更新日 (cr_dt)
   --until <YYYY-MM-DD>     upper bound of 新規更新日 (cr_dt)
 
@@ -173,7 +175,7 @@ func init() {
 	f.IntVar(&docSearchFGID, "form-group-id", 0, "form group ID (fgid); 0 = omit")
 	f.StringSliceVar(&docSearchWriters, "writer", nil, "writer user code (repeatable)")
 	f.StringSliceVar(&docSearchGroups, "writer-group", nil, "writer user-group code (repeatable)")
-	f.BoolVar(&docSearchMe, "me", false, "restrict to documents written by the current user (XPOINT_USER)")
+	f.BoolVar(&docSearchMe, "me", false, "restrict to documents written by the current user (XPOINT_USER, or /scim/v2/{domain_code}/Me)")
 	f.StringVar(&docSearchSince, "since", "", "lower bound of 新規更新日 (YYYY-MM-DD)")
 	f.StringVar(&docSearchUntil, "until", "", "upper bound of 新規更新日 (YYYY-MM-DD)")
 
@@ -218,7 +220,14 @@ func runDocumentSearch(cmd *cobra.Command, args []string) error {
 		if len(bodyBytes) > 0 {
 			return fmt.Errorf("--body cannot be combined with filter flags (--title, --form-*, --writer*, --me, --since, --until)")
 		}
-		built, err := buildSearchBodyFromFlags()
+		meCode := ""
+		if docSearchMe {
+			meCode, err = resolveCurrentUserCode(cmd.Context(), client)
+			if err != nil {
+				return err
+			}
+		}
+		built, err := buildSearchBodyFromFlags(meCode)
 		if err != nil {
 			return err
 		}
@@ -460,9 +469,33 @@ type writerListEntry struct {
 	Code string `json:"code"`
 }
 
+// resolveCurrentUserCode returns the authenticated user's login ID for --me.
+// It prefers XPOINT_USER / --xpoint-user; if neither is set, it falls back to
+// GET /scim/v2/{domain_code}/Me (which requires OAuth2 and the domain code).
+func resolveCurrentUserCode(ctx context.Context, client *xpoint.Client) (string, error) {
+	if u := pick(flagUser, "XPOINT_USER"); u != "" {
+		return u, nil
+	}
+	domain := pick(flagDomainCode, "XPOINT_DOMAIN_CODE")
+	if domain == "" {
+		return "", fmt.Errorf("--me requires the current user code: set --xpoint-user / XPOINT_USER, or --xpoint-domain-code / XPOINT_DOMAIN_CODE to look it up via /scim/v2/{domain_code}/Me")
+	}
+	info, err := client.GetSelfInfo(ctx, domain)
+	if err != nil {
+		return "", fmt.Errorf("resolve --me via /scim/v2/%s/Me: %w", domain, err)
+	}
+	if info.UserName == "" {
+		return "", fmt.Errorf("resolve --me: userName is empty in /scim/v2/%s/Me response", domain)
+	}
+	return info.UserName, nil
+}
+
 // buildSearchBodyFromFlags converts --title / --form-* / --writer* / --me /
 // --since / --until into a JSON request body for POST /api/v1/search/documents.
-func buildSearchBodyFromFlags() (json.RawMessage, error) {
+//
+// meCode is the resolved user code to use for --me (empty if --me was not set
+// or resolution is not needed).
+func buildSearchBodyFromFlags(meCode string) (json.RawMessage, error) {
 	body := map[string]any{}
 
 	if docSearchTitle != "" {
@@ -489,12 +522,8 @@ func buildSearchBodyFromFlags() (json.RawMessage, error) {
 			writers = append(writers, writerListEntry{Type: "group", Code: code})
 		}
 	}
-	if docSearchMe {
-		me := pick(flagUser, "XPOINT_USER")
-		if me == "" {
-			return nil, fmt.Errorf("--me requires the current user code: set --xpoint-user or XPOINT_USER")
-		}
-		writers = append(writers, writerListEntry{Type: "user", Code: me})
+	if meCode != "" {
+		writers = append(writers, writerListEntry{Type: "user", Code: meCode})
 	}
 	if len(writers) > 0 {
 		body["writer_list"] = writers

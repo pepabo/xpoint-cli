@@ -104,7 +104,7 @@ xp document search --title 経費                       # 件名部分一致
 xp document search --form-name 稟議 --form-group-id 3 # フォーム名 + フォームグループID
 xp document search --writer alice --writer bob        # 申請者指定（複数可）
 xp document search --writer-group grp1                # 申請者グループ指定
-xp document search --me                               # 自分が申請者の書類
+xp document search --me                               # 自分が申請者の書類（XPOINT_USER、未設定なら /scim/v2/{domain_code}/Me から取得）
 xp document search --since 2024-01-01 --until 2024-12-31
 ```
 

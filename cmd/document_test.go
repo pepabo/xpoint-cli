@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -13,18 +14,7 @@ import (
 // zero values so each test starts from a clean slate.
 func resetSearchFlags(t *testing.T) {
 	t.Helper()
-	docSearchBody = ""
-	docSearchTitle = ""
-	docSearchFormName = ""
-	docSearchFormID = 0
-	docSearchFGID = 0
-	docSearchWriters = nil
-	docSearchGroups = nil
-	docSearchMe = false
-	docSearchSince = ""
-	docSearchUntil = ""
-	flagUser = ""
-	t.Cleanup(func() {
+	clear := func() {
 		docSearchBody = ""
 		docSearchTitle = ""
 		docSearchFormName = ""
@@ -36,7 +26,10 @@ func resetSearchFlags(t *testing.T) {
 		docSearchSince = ""
 		docSearchUntil = ""
 		flagUser = ""
-	})
+		flagDomainCode = ""
+	}
+	clear()
+	t.Cleanup(clear)
 }
 
 func TestBuildSearchBody_TitleAndForm(t *testing.T) {
@@ -46,7 +39,7 @@ func TestBuildSearchBody_TitleAndForm(t *testing.T) {
 	docSearchFormID = 42
 	docSearchFGID = 7
 
-	raw, err := buildSearchBodyFromFlags()
+	raw, err := buildSearchBodyFromFlags("")
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -73,7 +66,7 @@ func TestBuildSearchBody_Writers(t *testing.T) {
 	docSearchWriters = []string{"u1", "u2"}
 	docSearchGroups = []string{"g1"}
 
-	raw, err := buildSearchBodyFromFlags()
+	raw, err := buildSearchBodyFromFlags("")
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -100,41 +93,15 @@ func TestBuildSearchBody_Writers(t *testing.T) {
 	}
 }
 
-func TestBuildSearchBody_MeRequiresUser(t *testing.T) {
+func TestBuildSearchBody_MeCodeAppendsWriter(t *testing.T) {
 	resetSearchFlags(t)
-	docSearchMe = true
 
-	_, err := buildSearchBodyFromFlags()
-	if err == nil || !strings.Contains(err.Error(), "--me requires") {
-		t.Errorf("err = %v", err)
-	}
-}
-
-func TestBuildSearchBody_MeWithFlagUser(t *testing.T) {
-	resetSearchFlags(t)
-	docSearchMe = true
-	flagUser = "alice"
-
-	raw, err := buildSearchBodyFromFlags()
+	raw, err := buildSearchBodyFromFlags("alice")
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
 	if !strings.Contains(string(raw), `"code":"alice"`) {
-		t.Errorf("body missing current user: %s", string(raw))
-	}
-}
-
-func TestBuildSearchBody_MeFromEnv(t *testing.T) {
-	resetSearchFlags(t)
-	docSearchMe = true
-	t.Setenv("XPOINT_USER", "bob")
-
-	raw, err := buildSearchBodyFromFlags()
-	if err != nil {
-		t.Fatalf("build: %v", err)
-	}
-	if !strings.Contains(string(raw), `"code":"bob"`) {
-		t.Errorf("body missing env user: %s", string(raw))
+		t.Errorf("body missing me user: %s", string(raw))
 	}
 }
 
@@ -143,7 +110,7 @@ func TestBuildSearchBody_SinceUntil(t *testing.T) {
 	docSearchSince = "2024-01-15"
 	docSearchUntil = "2024-12-31"
 
-	raw, err := buildSearchBodyFromFlags()
+	raw, err := buildSearchBodyFromFlags("")
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -169,8 +136,45 @@ func TestBuildSearchBody_InvalidSince(t *testing.T) {
 	resetSearchFlags(t)
 	docSearchSince = "2024/01/15"
 
-	_, err := buildSearchBodyFromFlags()
+	_, err := buildSearchBodyFromFlags("")
 	if err == nil || !strings.Contains(err.Error(), "--since") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestResolveCurrentUserCode_UsesFlagUser(t *testing.T) {
+	resetSearchFlags(t)
+	flagUser = "alice"
+
+	code, err := resolveCurrentUserCode(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if code != "alice" {
+		t.Errorf("code = %q, want alice", code)
+	}
+}
+
+func TestResolveCurrentUserCode_UsesEnvUser(t *testing.T) {
+	resetSearchFlags(t)
+	t.Setenv("XPOINT_USER", "bob")
+
+	code, err := resolveCurrentUserCode(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if code != "bob" {
+		t.Errorf("code = %q, want bob", code)
+	}
+}
+
+func TestResolveCurrentUserCode_ErrorsWithoutUserOrDomain(t *testing.T) {
+	resetSearchFlags(t)
+	t.Setenv("XPOINT_USER", "")
+	t.Setenv("XPOINT_DOMAIN_CODE", "")
+
+	_, err := resolveCurrentUserCode(context.Background(), nil)
+	if err == nil || !strings.Contains(err.Error(), "--xpoint-user") {
 		t.Errorf("err = %v", err)
 	}
 }

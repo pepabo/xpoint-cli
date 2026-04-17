@@ -355,6 +355,26 @@ func (c *Client) DeleteDocument(ctx context.Context, docID int) (*DeleteDocument
 	return &out, nil
 }
 
+type SelfInfo struct {
+	ID          string `json:"id"`
+	UserName    string `json:"userName"`
+	DisplayName string `json:"displayName"`
+}
+
+// GetSelfInfo calls GET /scim/v2/{domain_code}/Me to fetch the authenticated
+// user's info. Requires OAuth2 bearer auth.
+func (c *Client) GetSelfInfo(ctx context.Context, domainCode string) (*SelfInfo, error) {
+	if domainCode == "" {
+		return nil, fmt.Errorf("domain code is required for /scim/v2/{domain_code}/Me")
+	}
+	path := fmt.Sprintf("/scim/v2/%s/Me", url.PathEscape(domainCode))
+	var out SelfInfo
+	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // DownloadPDF calls GET /api/v1/documents/{docid}/pdf and returns the PDF
 // bytes and the server-provided filename (parsed from Content-Disposition,
 // which may use RFC 5987 encoding). The filename is empty when the server

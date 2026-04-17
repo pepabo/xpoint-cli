@@ -356,6 +356,37 @@ func TestDocumentURL(t *testing.T) {
 	}
 }
 
+func TestGetSelfInfo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/scim/v2/acme/Me" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/scim+json")
+		_, _ = w.Write([]byte(`{"id":"100","userName":"u001","displayName":"田中"}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	info, err := c.GetSelfInfo(context.Background(), "acme")
+	if err != nil {
+		t.Fatalf("GetSelfInfo: %v", err)
+	}
+	if info.UserName != "u001" || info.ID != "100" || info.DisplayName != "田中" {
+		t.Errorf("info = %+v", info)
+	}
+}
+
+func TestGetSelfInfo_RequiresDomainCode(t *testing.T) {
+	c := NewClient("unused", Auth{AccessToken: "t"})
+	_, err := c.GetSelfInfo(context.Background(), "")
+	if err == nil || !strings.Contains(err.Error(), "domain code is required") {
+		t.Errorf("err = %v", err)
+	}
+}
+
 func TestDownloadPDF(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
