@@ -193,6 +193,30 @@ func (c *Client) GetSystemFormDetail(ctx context.Context, formID int) (*FormDeta
 	return &out, nil
 }
 
+type Lumpapply struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	FormID    int    `json:"form_id"`
+	FormCode  string `json:"form_cd"`
+	FormName  string `json:"form_name"`
+	RouteID   int    `json:"route_id"`
+	RouteCode string `json:"route_cd"`
+	RouteName string `json:"route_name"`
+}
+
+type LumpapplyListResponse struct {
+	Lumpapply []Lumpapply `json:"lumpapply"`
+}
+
+// ListLumpapply calls GET /api/v1/system/lumpapply (admin).
+func (c *Client) ListLumpapply(ctx context.Context) (*LumpapplyListResponse, error) {
+	var out LumpapplyListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/system/lumpapply", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 type Master struct {
 	Type      int    `json:"type"`
 	TypeName  string `json:"type_name"`
@@ -449,6 +473,18 @@ func (c *Client) ListWebhooklog(ctx context.Context, p WebhooklogListParams) (*W
 // type, so it is returned as raw JSON.
 func (c *Client) GetWebhooklog(ctx context.Context, uuid string) (json.RawMessage, error) {
 	path := fmt.Sprintf("/api/v1/system/webhooklog/%s", url.PathEscape(uuid))
+	var out json.RawMessage
+	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetLumpapply calls GET /api/v1/system/lumpapply/{lumpapplyid} (admin).
+// The response shape is complex (csv_format, apply/create/lastaprv, etc.)
+// so it is returned as raw JSON for the caller to interpret.
+func (c *Client) GetLumpapply(ctx context.Context, lumpapplyID int) (json.RawMessage, error) {
+	path := fmt.Sprintf("/api/v1/system/lumpapply/%d", lumpapplyID)
 	var out json.RawMessage
 	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
 		return nil, err

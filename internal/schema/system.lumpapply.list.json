@@ -1,0 +1,53 @@
+{
+  "method": "GET",
+  "path": "/api/v1/system/lumpapply",
+  "summary": "自動申請登録の一覧取得",
+  "description": "認証ドメインの管理サイトに登録されている自動申請の一覧を取得する。\n管理者権限が必要。\n",
+  "parameters": [],
+  "response": {
+    "type": "object",
+    "properties": {
+      "lumpapply": {
+        "type": "array",
+        "description": "自動申請情報 (存在しない場合は空配列)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "自動申請ID (system lumpapply show で利用)"
+            },
+            "name": {
+              "type": "string",
+              "description": "自動申請名称"
+            },
+            "form_id": {
+              "type": "integer",
+              "description": "フォームID"
+            },
+            "form_cd": {
+              "type": "string",
+              "description": "フォームコード"
+            },
+            "form_name": {
+              "type": "string",
+              "description": "フォーム名称"
+            },
+            "route_id": {
+              "type": "integer",
+              "description": "ルートID"
+            },
+            "route_cd": {
+              "type": "string",
+              "description": "ルートコード"
+            },
+            "route_name": {
+              "type": "string",
+              "description": "ルート名称"
+            }
+          }
+        }
+      }
+    }
+  }
+}

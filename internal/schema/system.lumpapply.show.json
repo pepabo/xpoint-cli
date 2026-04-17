@@ -1,0 +1,182 @@
+{
+  "method": "GET",
+  "path": "/api/v1/system/lumpapply/{lumpapplyid}",
+  "summary": "自動申請の定義情報取得",
+  "description": "指定された自動申請登録 ID の詳細設定を取得する。\n管理者権限が必要。\n",
+  "parameters": [
+    {
+      "name": "lumpapplyid",
+      "in": "path",
+      "required": true,
+      "type": "integer",
+      "description": "自動申請ID (system lumpapply list の id)"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "lumpapply": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "自動申請登録名称"
+          },
+          "form": {
+            "type": "object",
+            "description": "フォーム情報",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "フォーム名称"
+              },
+              "code": {
+                "type": "string",
+                "description": "フォームコード"
+              }
+            }
+          },
+          "route": {
+            "type": "object",
+            "description": "承認ルート情報",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "ルート名称"
+              },
+              "code": {
+                "type": "string",
+                "description": "ルートコード"
+              }
+            }
+          },
+          "import_file": {
+            "type": "object",
+            "description": "取込ファイル情報",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "取込ファイル名称"
+              },
+              "success": {
+                "type": "integer",
+                "description": "成功時処理 (数値)"
+              },
+              "success_str": {
+                "type": "string",
+                "description": "成功時処理 (文字列)"
+              },
+              "failed": {
+                "type": "integer",
+                "description": "失敗時処理 (数値)"
+              },
+              "failed_str": {
+                "type": "string",
+                "description": "失敗時処理 (文字列)"
+              }
+            }
+          },
+          "first_row": {
+            "type": "integer",
+            "description": "取込ファイル1行目の処理 (数値)"
+          },
+          "first_row_str": {
+            "type": "string",
+            "description": "取込ファイル1行目の処理 (文字列)"
+          },
+          "first_colum": {
+            "type": "integer",
+            "description": "申請書類の切り替え判定項目 (数値)"
+          },
+          "first_colum_str": {
+            "type": "string",
+            "description": "申請書類の切り替え判定項目 (文字列)"
+          },
+          "remarks": {
+            "type": "string",
+            "description": "備考"
+          },
+          "apply": {
+            "type": "object",
+            "description": "申請者情報",
+            "properties": {
+              "usertype": {
+                "type": "string",
+                "description": "申請者種別"
+              },
+              "usercode": {
+                "type": "string",
+                "description": "申請者コード"
+              },
+              "username": {
+                "type": "string",
+                "description": "申請者氏名"
+              }
+            }
+          },
+          "create": {
+            "type": "object",
+            "description": "作成者情報",
+            "properties": {
+              "username": {
+                "type": "string",
+                "description": "作成者氏名"
+              },
+              "datetime": {
+                "type": "string",
+                "description": "作成日"
+              }
+            }
+          },
+          "lastaprv": {
+            "type": "object",
+            "description": "最終更新者情報",
+            "properties": {
+              "username": {
+                "type": "string",
+                "description": "最終更新者氏名"
+              },
+              "datetime": {
+                "type": "string",
+                "description": "更新日"
+              }
+            }
+          },
+          "csv_format": {
+            "type": "array",
+            "description": "CSVフォーマット情報",
+            "items": {
+              "type": "object",
+              "properties": {
+                "seq": {
+                  "type": "integer",
+                  "description": "シーケンス番号"
+                },
+                "field_id": {
+                  "type": "string",
+                  "description": "フィールドID"
+                },
+                "field_name": {
+                  "type": "string",
+                  "description": "フィールド名称"
+                },
+                "page_no": {
+                  "type": "integer",
+                  "description": "ページ番号"
+                },
+                "apply_user": {
+                  "type": "boolean",
+                  "description": "申請ユーザー使用判定"
+                },
+                "group_key": {
+                  "type": "boolean",
+                  "description": "グループキー使用判定"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
