@@ -41,6 +41,8 @@ var (
 
 	docStatusHistory bool
 	docStatusJQ      string
+
+	docOpenNoBrowser bool
 )
 
 var documentCmd = &cobra.Command{
@@ -127,6 +129,17 @@ approval histories for all past versions.`,
 	RunE: runDocumentStatus,
 }
 
+var documentOpenCmd = &cobra.Command{
+	Use:   "open <docid>",
+	Short: "Open a document in the default web browser",
+	Long: `Open the document view page in the default web browser.
+
+The URL is built from the configured subdomain (no API request is made).
+Pass --no-browser (or -n) to print the URL without launching the browser.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentOpen,
+}
+
 var documentDownloadCmd = &cobra.Command{
 	Use:   "download <docid>",
 	Short: "Download a document as PDF",
@@ -150,6 +163,7 @@ func init() {
 	documentCmd.AddCommand(documentDeleteCmd)
 	documentCmd.AddCommand(documentStatusCmd)
 	documentCmd.AddCommand(documentDownloadCmd)
+	documentCmd.AddCommand(documentOpenCmd)
 
 	f := documentSearchCmd.Flags()
 	f.StringVar(&docSearchBody, "body", "", "search condition JSON: inline, file path, or - for stdin")
@@ -184,6 +198,9 @@ func init() {
 
 	dlf := documentDownloadCmd.Flags()
 	dlf.StringVarP(&docDownloadOutput, "output", "o", "", "output path: FILE, DIR/, or - for stdout (default: server-provided filename in current directory)")
+
+	of := documentOpenCmd.Flags()
+	of.BoolVarP(&docOpenNoBrowser, "no-browser", "n", false, "print the URL without launching the browser")
 }
 
 func runDocumentSearch(cmd *cobra.Command, args []string) error {
@@ -398,6 +415,28 @@ func runDocumentDownload(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("write pdf: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "saved: %s (%d bytes)\n", dst, len(data))
+	return nil
+}
+
+func runDocumentOpen(_ *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	sub, err := resolveSubdomain()
+	if err != nil {
+		return err
+	}
+	url := xpoint.NewClient(sub, xpoint.Auth{}).DocumentURL(docID)
+
+	if docOpenNoBrowser {
+		fmt.Fprintln(os.Stdout, url)
+		return nil
+	}
+	fmt.Fprintf(os.Stdout, "Opening %s\n", url)
+	if err := openBrowser(url); err != nil {
+		return fmt.Errorf("open browser: %w (run with --no-browser to print the URL)", err)
+	}
 	return nil
 }
 
