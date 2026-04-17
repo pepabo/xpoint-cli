@@ -109,6 +109,17 @@ cat search.json | xp document search --body -
 xp document search --size 100 --page 2
 ```
 
+フィルタフラグで簡易検索もできます（`--body` とは併用不可）。
+
+```sh
+xp document search --title 経費                       # 件名部分一致
+xp document search --form-name 稟議 --form-group-id 3 # フォーム名 + フォームグループID
+xp document search --writer alice --writer bob        # 申請者指定（複数可）
+xp document search --writer-group grp1                # 申請者グループ指定
+xp document search --me                               # 自分が申請者の書類（XPOINT_USER、未設定なら /scim/v2/{domain_code}/Me の atled 拡張 userCode を利用。domain_code は保存済み OAuth トークンの値も利用）
+xp document search --since 2024-01-01 --until 2024-12-31
+```
+
 ### ドキュメントの承認状況取得
 
 ```sh
@@ -144,6 +155,17 @@ xp document download 266248 -o out.pdf     # 指定パスに保存
 xp document download 266248 -o pdfs/       # 指定ディレクトリにサーバ提供ファイル名で保存
 xp document download 266248 -o - > out.pdf # 標準出力に書き出し
 ```
+
+### 認証ユーザー情報の確認
+
+```sh
+xp me                  # GET /scim/v2/{domain_code}/Me の結果を表示
+xp me --jq .userName
+```
+
+OAuth 認証済みであることが前提です（汎用APIトークンでは SCIM は使えません）。`domain_code` は `--xpoint-domain-code` / `XPOINT_DOMAIN_CODE` / 保存済み OAuth トークンの順で解決されます。
+
+`user_code` は X-point の内部ユーザコード（例: `326`）で、`document search --writer` などの writer_list API で使う値です。`user_name` は SCIM の `userName`（ログイン名、例: `ykky`）です。
 
 ### レスポンススキーマの確認
 

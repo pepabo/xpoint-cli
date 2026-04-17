@@ -59,6 +59,20 @@ func resolveSubdomain() (string, error) {
 	return "", errors.New("subdomain is required: set --xpoint-subdomain or XPOINT_SUBDOMAIN, or run 'xp auth login' first")
 }
 
+// resolveDomainCode returns the X-point domain code in priority order:
+// --xpoint-domain-code flag, XPOINT_DOMAIN_CODE env, then the domain code
+// saved alongside the OAuth token by `xp auth login`. Returns an empty
+// string if none is available.
+func resolveDomainCode() string {
+	if d := pick(flagDomainCode, "XPOINT_DOMAIN_CODE"); d != "" {
+		return d
+	}
+	if t, err := xpoint.LoadToken(); err == nil && t.DomainCode != "" {
+		return t.DomainCode
+	}
+	return ""
+}
+
 // authFromFlags returns the credential supplied via --xpoint-* command-line
 // flags. The bool is true only when the user explicitly passed flags. This is
 // the highest-priority auth source: a one-shot flag should always win.

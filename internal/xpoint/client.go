@@ -355,6 +355,33 @@ func (c *Client) DeleteDocument(ctx context.Context, docID int) (*DeleteDocument
 	return &out, nil
 }
 
+type SelfInfo struct {
+	ID          string `json:"id"`
+	UserName    string `json:"userName"`
+	DisplayName string `json:"displayName"`
+	// UserCode is the X-point user code from the atled SCIM extension
+	// (urn:atled:scim:schemas:1.0:User.userCode). It is the identifier used
+	// in writer_list and other X-point APIs — distinct from userName, which
+	// is the login name.
+	AtledExt struct {
+		UserCode string `json:"userCode"`
+	} `json:"urn:atled:scim:schemas:1.0:User"`
+}
+
+// GetSelfInfo calls GET /scim/v2/{domain_code}/Me to fetch the authenticated
+// user's info. Requires OAuth2 bearer auth.
+func (c *Client) GetSelfInfo(ctx context.Context, domainCode string) (*SelfInfo, error) {
+	if domainCode == "" {
+		return nil, fmt.Errorf("domain code is required for /scim/v2/{domain_code}/Me")
+	}
+	path := fmt.Sprintf("/scim/v2/%s/Me", url.PathEscape(domainCode))
+	var out SelfInfo
+	if err := c.doAccept(ctx, http.MethodGet, path, nil, nil, "application/scim+json", &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 type QueryForm struct {
 	FID      int    `json:"fid"`
 	FormName string `json:"form_name"`
@@ -582,6 +609,12 @@ func parseContentDispositionFilename(cd string) string {
 
 // do executes an HTTP request and decodes a JSON response into out.
 func (c *Client) do(ctx context.Context, method, path string, q url.Values, body []byte, out any) error {
+	return c.doAccept(ctx, method, path, q, body, "application/json", out)
+}
+
+// doAccept is like do but lets the caller specify the Accept header value.
+// SCIM endpoints, for instance, require "application/scim+json".
+func (c *Client) doAccept(ctx context.Context, method, path string, q url.Values, body []byte, accept string, out any) error {
 	u := c.baseURL + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
@@ -597,7 +630,9 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 		return err
 	}
 	c.auth.apply(req)
-	req.Header.Set("Accept", "application/json")
+	if accept != "" {
+		req.Header.Set("Accept", accept)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -614,6 +649,9 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 				val = redactToken(val)
 			}
 			fmt.Fprintf(os.Stderr, "[xp]   %s: %s\n", k, val)
+		}
+		if len(body) > 0 {
+			fmt.Fprintf(os.Stderr, "[xp]   body: %s\n", string(body))
 		}
 	}
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,18 +10,28 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/pepabo/xpoint-cli/internal/xpoint"
 	"github.com/spf13/cobra"
 )
 
 var (
-	docSearchBody   string
-	docSearchSize   int
-	docSearchOffset int
-	docSearchPage   int
-	docSearchOutput string
-	docSearchJQ     string
+	docSearchBody     string
+	docSearchSize     int
+	docSearchOffset   int
+	docSearchPage     int
+	docSearchOutput   string
+	docSearchJQ       string
+	docSearchTitle    string
+	docSearchFormName string
+	docSearchFormID   int
+	docSearchFGID     int
+	docSearchWriters  []string
+	docSearchGroups   []string
+	docSearchMe       bool
+	docSearchSince    string
+	docSearchUntil    string
 
 	docCreateBody   string
 	docCreateOutput string
@@ -69,12 +80,28 @@ var documentSearchCmd = &cobra.Command{
 	Short: "Search documents",
 	Long: `Search documents via POST /api/v1/search/documents.
 
-The search condition JSON is provided with --body, which accepts one of:
+The search condition can be specified by either a raw JSON body (--body) or
+convenience filter flags. Mixing --body with filter flags is rejected.
+
+Raw body (--body) accepts one of:
   - inline JSON string                    (e.g. --body '{"title":"経費"}')
   - a path to a JSON file                 (e.g. --body ./search.json)
   - "-" to read the body from stdin       (e.g. --body -)
 
-If --body is omitted, an empty object is sent (matches all documents).`,
+Filter flags build a search body automatically:
+  --title <s>              partial match on the document title (件名)
+  --form-name <s>          partial match on the form name
+  --form-id <n>            form ID (fid)
+  --form-group-id <n>      form group ID (fgid)
+  --writer <code>          writer user code (repeatable)
+  --writer-group <code>    writer user-group code (repeatable)
+  --me                     shorthand for --writer <current user code>;
+                           looked up via XPOINT_USER or /scim/v2/{domain_code}/Me
+  --since <YYYY-MM-DD>     lower bound of 新規更新日 (cr_dt)
+  --until <YYYY-MM-DD>     upper bound of 新規更新日 (cr_dt)
+
+If neither --body nor any filter flag is given, an empty object is sent
+(matches all documents).`,
 	RunE: runDocumentSearch,
 }
 
@@ -230,12 +257,21 @@ func init() {
 	documentCommentCmd.AddCommand(documentCommentDeleteCmd)
 
 	f := documentSearchCmd.Flags()
-	f.StringVar(&docSearchBody, "body", "", "search condition JSON: inline, file path, or - for stdin")
+	f.StringVar(&docSearchBody, "body", "", "search condition JSON: inline, file path, or - for stdin (cannot be combined with filter flags)")
 	f.IntVar(&docSearchSize, "size", 0, "number of items per page (0 = omit, server default 50; max 1000)")
 	f.IntVar(&docSearchOffset, "offset", 0, "result offset (0 = omit)")
 	f.IntVar(&docSearchPage, "page", 0, "result page (0 = omit)")
 	f.StringVarP(&docSearchOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
 	f.StringVar(&docSearchJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+	f.StringVar(&docSearchTitle, "title", "", "partial match on document title")
+	f.StringVar(&docSearchFormName, "form-name", "", "partial match on form name")
+	f.IntVar(&docSearchFormID, "form-id", 0, "form ID (fid); 0 = omit")
+	f.IntVar(&docSearchFGID, "form-group-id", 0, "form group ID (fgid); 0 = omit")
+	f.StringSliceVar(&docSearchWriters, "writer", nil, "writer user code (repeatable)")
+	f.StringSliceVar(&docSearchGroups, "writer-group", nil, "writer user-group code (repeatable)")
+	f.BoolVar(&docSearchMe, "me", false, "restrict to documents written by the current user (XPOINT_USER, or /scim/v2/{domain_code}/Me)")
+	f.StringVar(&docSearchSince, "since", "", "lower bound of 新規更新日 (YYYY-MM-DD)")
+	f.StringVar(&docSearchUntil, "until", "", "upper bound of 新規更新日 (YYYY-MM-DD)")
 
 	cf := documentCreateCmd.Flags()
 	cf.StringVar(&docCreateBody, "body", "", "request body JSON: inline, file path, or - for stdin (required)")
@@ -297,6 +333,27 @@ func runDocumentSearch(cmd *cobra.Command, args []string) error {
 	bodyBytes, err := loadSearchBody(docSearchBody)
 	if err != nil {
 		return err
+	}
+
+	hasFilters := docSearchTitle != "" || docSearchFormName != "" || docSearchFormID != 0 ||
+		docSearchFGID != 0 || len(docSearchWriters) > 0 || len(docSearchGroups) > 0 ||
+		docSearchMe || docSearchSince != "" || docSearchUntil != ""
+	if hasFilters {
+		if len(bodyBytes) > 0 {
+			return fmt.Errorf("--body cannot be combined with filter flags (--title, --form-*, --writer*, --me, --since, --until)")
+		}
+		meCode := ""
+		if docSearchMe {
+			meCode, err = resolveCurrentUserCode(cmd.Context(), client)
+			if err != nil {
+				return err
+			}
+		}
+		built, err := buildSearchBodyFromFlags(meCode)
+		if err != nil {
+			return err
+		}
+		bodyBytes = built
 	}
 
 	params := xpoint.SearchDocumentsParams{}
@@ -719,6 +776,107 @@ func confirmDelete(docID int) bool {
 		return true
 	}
 	return false
+}
+
+type writerListEntry struct {
+	Type string `json:"type"`
+	Code string `json:"code"`
+}
+
+// resolveCurrentUserCode returns the authenticated user's X-point user code
+// for --me. It prefers XPOINT_USER / --xpoint-user; if neither is set, it
+// falls back to GET /scim/v2/{domain_code}/Me and reads the atled SCIM
+// extension's userCode (not userName — that's the login name, while the
+// writer_list API expects the numeric user code).
+func resolveCurrentUserCode(ctx context.Context, client *xpoint.Client) (string, error) {
+	if u := pick(flagUser, "XPOINT_USER"); u != "" {
+		return u, nil
+	}
+	domain := resolveDomainCode()
+	if domain == "" {
+		return "", fmt.Errorf("--me requires the current user code: set --xpoint-user / XPOINT_USER, or provide a domain code (--xpoint-domain-code / XPOINT_DOMAIN_CODE / stored OAuth login) to look it up via /scim/v2/{domain_code}/Me")
+	}
+	info, err := client.GetSelfInfo(ctx, domain)
+	if err != nil {
+		return "", fmt.Errorf("resolve --me via /scim/v2/%s/Me: %w", domain, err)
+	}
+	if info.AtledExt.UserCode == "" {
+		return "", fmt.Errorf("resolve --me: userCode is empty in /scim/v2/%s/Me response (atled SCIM extension missing)", domain)
+	}
+	return info.AtledExt.UserCode, nil
+}
+
+// buildSearchBodyFromFlags converts --title / --form-* / --writer* / --me /
+// --since / --until into a JSON request body for POST /api/v1/search/documents.
+//
+// meCode is the resolved user code to use for --me (empty if --me was not set
+// or resolution is not needed).
+func buildSearchBodyFromFlags(meCode string) (json.RawMessage, error) {
+	body := map[string]any{}
+
+	if docSearchTitle != "" {
+		body["title"] = docSearchTitle
+	}
+	if docSearchFormName != "" {
+		body["form_name"] = docSearchFormName
+	}
+	if docSearchFormID != 0 {
+		body["fid"] = docSearchFormID
+	}
+	if docSearchFGID != 0 {
+		body["fgid"] = docSearchFGID
+	}
+
+	var writers []writerListEntry
+	for _, code := range docSearchWriters {
+		if code = strings.TrimSpace(code); code != "" {
+			writers = append(writers, writerListEntry{Type: "user", Code: code})
+		}
+	}
+	for _, code := range docSearchGroups {
+		if code = strings.TrimSpace(code); code != "" {
+			writers = append(writers, writerListEntry{Type: "group", Code: code})
+		}
+	}
+	if meCode != "" {
+		writers = append(writers, writerListEntry{Type: "user", Code: meCode})
+	}
+	if len(writers) > 0 {
+		body["writer_list"] = writers
+	}
+
+	if docSearchSince != "" || docSearchUntil != "" {
+		body["date_type"] = "cr_dt"
+		body["dt_cond_type"] = "1"
+		if docSearchSince != "" {
+			t, err := parseSearchDate(docSearchSince)
+			if err != nil {
+				return nil, fmt.Errorf("--since: %w", err)
+			}
+			body["lower_year"] = t.Year()
+			body["lower_month"] = int(t.Month())
+			body["lower_day"] = t.Day()
+		}
+		if docSearchUntil != "" {
+			t, err := parseSearchDate(docSearchUntil)
+			if err != nil {
+				return nil, fmt.Errorf("--until: %w", err)
+			}
+			body["upper_year"] = t.Year()
+			body["upper_month"] = int(t.Month())
+			body["upper_day"] = t.Day()
+		}
+	}
+
+	return json.Marshal(body)
+}
+
+func parseSearchDate(s string) (time.Time, error) {
+	t, err := time.Parse("2006-01-02", strings.TrimSpace(s))
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid date %q: expected YYYY-MM-DD", s)
+	}
+	return t, nil
 }
 
 // loadSearchBody resolves --body into JSON bytes.
