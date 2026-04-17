@@ -1,0 +1,48 @@
+{
+  "method": "POST",
+  "path": "/multiapi/v1/system/master/{master_table_name}/data",
+  "summary": "ユーザ固有マスタデータアップロード",
+  "description": "ユーザ固有マスタのインポートに利用する CSV ファイルを X-point へアップロードする (インポート自体は実行しない)。\n事前に対象のユーザ固有マスタに「ユーザ固有マスタインポートバッチ」の登録が必要。\n管理者権限が必要。\n",
+  "parameters": [
+    {
+      "name": "master_table_name",
+      "in": "path",
+      "required": true,
+      "type": "string",
+      "description": "マスタテーブル名"
+    }
+  ],
+  "requestBody": {
+    "contentType": "multipart/form-data",
+    "type": "object",
+    "properties": {
+      "file": {
+        "type": "string",
+        "format": "binary",
+        "required": true,
+        "description": "アップロード CSV ファイル"
+      },
+      "overwrite": {
+        "type": "boolean",
+        "description": "true: 上書きする / false: 上書きしない (default false)"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "master": {
+        "type": "object",
+        "description": "マスタ情報"
+      },
+      "message_type": {
+        "type": "integer",
+        "description": "メッセージタイプ (3:INFO 固定)"
+      },
+      "message": {
+        "type": "string",
+        "description": "メッセージ内容"
+      }
+    }
+  }
+}

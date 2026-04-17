@@ -1,0 +1,62 @@
+{
+  "method": "GET",
+  "path": "/api/v1/system/master/{master_code}/data",
+  "summary": "マスタデータ取得",
+  "description": "簡易マスタまたはユーザ固有マスタのデータを JSON または CSV で取得する。\nURL の末尾を data.json / data.csv とすることでフォーマットを切り替える。\n",
+  "parameters": [
+    {
+      "name": "master_code",
+      "in": "path",
+      "required": true,
+      "type": "string",
+      "description": "マスタ識別情報 (簡易:マスタコード / ユーザ固有:テーブル名)"
+    },
+    {
+      "name": "master_type",
+      "in": "query",
+      "required": true,
+      "type": "integer",
+      "description": "0:簡易マスタ / 1:ユーザ固有マスタ"
+    },
+    {
+      "name": "rows",
+      "in": "query",
+      "type": "integer",
+      "description": "取得行数 (default 100, max 1000)"
+    },
+    {
+      "name": "offset",
+      "in": "query",
+      "type": "integer",
+      "description": "オフセット (default 0)"
+    },
+    {
+      "name": "file_name",
+      "in": "query",
+      "type": "string",
+      "description": "CSV ファイル名 (CSV 時のみ)"
+    },
+    {
+      "name": "delimiter",
+      "in": "query",
+      "type": "string",
+      "description": "区切り文字 comma|tab (CSV 時のみ)"
+    },
+    {
+      "name": "title",
+      "in": "query",
+      "type": "boolean",
+      "description": "CSV + ユーザ固有マスタ時のみ。先頭行にフィールド名を出力するか (default true)"
+    },
+    {
+      "name": "fields",
+      "in": "query",
+      "type": "string",
+      "description": "CSV + 簡易マスタ時のみ。出力項目をカンマ区切りで指定"
+    }
+  ],
+  "response": {
+    "contentType": "application/json | text/csv",
+    "description": "マスタデータ (JSON または CSV)"
+  }
+}
