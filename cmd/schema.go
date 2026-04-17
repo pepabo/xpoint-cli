@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pepabo/xpoint-cli/internal/xpoint"
+	"github.com/pepabo/xpoint-cli/internal/schema"
 	"github.com/spf13/cobra"
 )
 
@@ -32,13 +32,13 @@ func init() {
 func runSchema(_ *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stdout, "Supported aliases:")
-		for _, a := range xpoint.SchemaAliases() {
+		for _, a := range schema.Aliases() {
 			fmt.Fprintf(os.Stdout, "  %s\n", a)
 		}
 		return nil
 	}
 	alias := strings.TrimSpace(args[0])
-	op, err := xpoint.LookupOperation(alias)
+	op, err := schema.Lookup(alias)
 	if err != nil {
 		return err
 	}

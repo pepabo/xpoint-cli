@@ -1,0 +1,71 @@
+{
+  "method": "GET",
+  "path": "/api/v1/forms",
+  "summary": "利用可能フォーム一覧取得",
+  "description": "認証ユーザーが利用できるフォームのフォームID・名称を\n所属グループ (グループID・グループ名) とセットで返す。\n",
+  "parameters": [],
+  "response": {
+    "type": "object",
+    "properties": {
+      "form_group": {
+        "type": "array",
+        "description": "フォームグループ情報 (空配列になり得る)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "フォームグループID"
+            },
+            "name": {
+              "type": "string",
+              "description": "フォームグループ名称"
+            },
+            "form": {
+              "type": "array",
+              "description": "所属フォーム情報",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "description": "フォームID"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "フォームコード"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "フォーム名称"
+                  },
+                  "route": {
+                    "type": "array",
+                    "description": "承認ルート情報",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "承認ルートID"
+                        },
+                        "code": {
+                          "type": "string",
+                          "description": "承認ルートコード (通常フォーム/自動選択ルートでは含まれない)"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "承認ルート名称"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

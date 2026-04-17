@@ -1,0 +1,135 @@
+{
+  "method": "GET",
+  "path": "/api/v1/approvals",
+  "summary": "承認待ち一覧取得",
+  "description": "指定した承認状況タイプに該当する書類の一覧を返す。",
+  "parameters": [
+    {
+      "name": "stat",
+      "in": "query",
+      "type": "integer",
+      "required": true,
+      "description": "承認状況タイプ。\n10:承認待ち / 20:承認完了 / 30:申請中 / 40:差戻 / 50:取止 ほか\n詳細は X-point API ドキュメントを参照。\n"
+    },
+    {
+      "name": "fgid",
+      "in": "query",
+      "type": "integer",
+      "description": "フォームグループID で絞り込み"
+    },
+    {
+      "name": "fid",
+      "in": "query",
+      "type": "integer",
+      "description": "フォームID で絞り込み"
+    },
+    {
+      "name": "step",
+      "in": "query",
+      "type": "integer",
+      "description": "ステップ番号で絞り込み"
+    },
+    {
+      "name": "record_no",
+      "in": "query",
+      "type": "integer",
+      "description": "取得開始レコード番号"
+    },
+    {
+      "name": "get_line",
+      "in": "query",
+      "type": "integer",
+      "description": "取得件数"
+    },
+    {
+      "name": "proxy_user",
+      "in": "query",
+      "type": "string",
+      "description": "代理ユーザーコード"
+    },
+    {
+      "name": "filter",
+      "in": "query",
+      "type": "string",
+      "description": "絞り込み条件式 (例 `cr_dt between \"2023-01-01\" and \"2023-12-31\"`)"
+    },
+    {
+      "name": "show_hidden_doc",
+      "in": "query",
+      "type": "boolean",
+      "description": "非表示書類も含めて取得するか"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "total_count": {
+        "type": "integer",
+        "description": "該当件数"
+      },
+      "approval_list": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "docid": {
+              "type": "integer",
+              "description": "書類ID"
+            },
+            "hidden": {
+              "type": "boolean",
+              "description": "非表示書類フラグ (show_hidden_doc=true 指定時のみ含まれる)"
+            },
+            "attachment": {
+              "type": "boolean",
+              "description": "添付ファイルフラグ"
+            },
+            "comment": {
+              "type": "boolean",
+              "description": "コメントフラグ"
+            },
+            "title1": {
+              "type": "string",
+              "description": "件名1"
+            },
+            "title2": {
+              "type": "string",
+              "description": "件名2"
+            },
+            "form_name": {
+              "type": "string",
+              "description": "フォーム名称"
+            },
+            "status": {
+              "type": "string",
+              "description": "ステータス名称"
+            },
+            "display_status": {
+              "type": "string",
+              "description": "画面表示ステータス名称"
+            },
+            "apply_datetime": {
+              "type": "string",
+              "description": "申請日時 (YYYY/MM/DD hh:mm:ss)"
+            },
+            "apply_user": {
+              "type": "string",
+              "description": "申請者氏名"
+            },
+            "approval_user": {
+              "type": "array",
+              "description": "現在ステップの承認者一覧",
+              "items": {
+                "type": "string"
+              }
+            },
+            "lastaprv_datetime": {
+              "type": "string",
+              "description": "最終更新日時 (YYYY/MM/DD hh:mm:ss)"
+            }
+          }
+        }
+      }
+    }
+  }
+}

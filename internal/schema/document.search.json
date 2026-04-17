@@ -1,0 +1,130 @@
+{
+  "method": "POST",
+  "path": "/api/v1/search/documents",
+  "summary": "書類検索",
+  "description": "検索条件を JSON ボディで指定して書類を検索する。\nボディは省略可 (省略時は全書類が対象)。\n",
+  "parameters": [
+    {
+      "name": "size",
+      "in": "query",
+      "type": "integer",
+      "description": "1ページあたりの取得件数"
+    },
+    {
+      "name": "offset",
+      "in": "query",
+      "type": "integer",
+      "description": "取得開始位置"
+    },
+    {
+      "name": "page",
+      "in": "query",
+      "type": "integer",
+      "description": "ページ番号"
+    }
+  ],
+  "requestBody": {
+    "contentType": "application/json",
+    "description": "任意の検索条件を JSON で指定する。代表的なキー:\n  * title          件名1/件名2 (部分一致)\n  * form_name      フォーム名称 (部分一致)\n  * fgid / fid     フォームグループID / フォームID\n  * comment_flg    コメントフラグ (0:条件なし 1:あり 2:なし)\n  * order          並び替え条件 (例 `-title1`)\nその他の条件キーは X-point API ドキュメントを参照。\n"
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "total_count": {
+        "type": "integer",
+        "description": "該当件数"
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "docid": {
+              "type": "integer",
+              "description": "書類ID"
+            },
+            "has_attachments": {
+              "type": "boolean",
+              "description": "添付ファイルの有無"
+            },
+            "has_comments": {
+              "type": "boolean",
+              "description": "コメントの有無"
+            },
+            "title1": {
+              "type": "string",
+              "description": "件名1"
+            },
+            "title2": {
+              "type": "string",
+              "description": "件名2"
+            },
+            "form": {
+              "type": "object",
+              "description": "フォーム情報",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "フォームID"
+                },
+                "code": {
+                  "type": "string",
+                  "description": "フォームコード"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "フォーム名称"
+                }
+              }
+            },
+            "route": {
+              "type": "object",
+              "description": "承認ルート情報",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "承認ルートコード"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "承認ルート名称"
+                }
+              }
+            },
+            "step": {
+              "type": "integer",
+              "description": "ステップ番号"
+            },
+            "stat": {
+              "type": "integer",
+              "description": "承認状況 (-1 は通常フォーム)"
+            },
+            "write_datetime": {
+              "type": "string",
+              "description": "申請日時 (YYYY/MM/DD hh:mm:ss)"
+            },
+            "update_datetime": {
+              "type": "string",
+              "description": "更新日時 (YYYY/MM/DD hh:mm:ss)"
+            },
+            "writer": {
+              "type": "string",
+              "description": "申請者"
+            },
+            "current_approvers": {
+              "type": "array",
+              "description": "現在ステップの承認者一覧",
+              "items": {
+                "type": "string"
+              }
+            },
+            "url": {
+              "type": "string",
+              "description": "書類URL"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,12 +1,12 @@
-package xpoint
+package schema
 
 import (
 	"strings"
 	"testing"
 )
 
-func TestSchemaAliases_Sorted(t *testing.T) {
-	got := SchemaAliases()
+func TestAliases_Sorted(t *testing.T) {
+	got := Aliases()
 	want := []string{"approval.list", "document.search", "form.list"}
 	if len(got) != len(want) {
 		t.Fatalf("aliases = %v", got)
@@ -18,17 +18,17 @@ func TestSchemaAliases_Sorted(t *testing.T) {
 	}
 }
 
-func TestLookupOperation_Unknown(t *testing.T) {
-	_, err := LookupOperation("nope.missing")
+func TestLookup_Unknown(t *testing.T) {
+	_, err := Lookup("nope.missing")
 	if err == nil || !strings.Contains(err.Error(), "unknown schema alias") {
 		t.Errorf("err = %v", err)
 	}
 }
 
-func TestLookupOperation_FormList(t *testing.T) {
-	op, err := LookupOperation("form.list")
+func TestLookup_FormList(t *testing.T) {
+	op, err := Lookup("form.list")
 	if err != nil {
-		t.Fatalf("LookupOperation: %v", err)
+		t.Fatalf("Lookup: %v", err)
 	}
 	if op["method"] != "GET" {
 		t.Errorf("method = %v", op["method"])
@@ -51,10 +51,10 @@ func TestLookupOperation_FormList(t *testing.T) {
 	}
 }
 
-func TestLookupOperation_ApprovalList_RequiredStat(t *testing.T) {
-	op, err := LookupOperation("approval.list")
+func TestLookup_ApprovalList_RequiredStat(t *testing.T) {
+	op, err := Lookup("approval.list")
 	if err != nil {
-		t.Fatalf("LookupOperation: %v", err)
+		t.Fatalf("Lookup: %v", err)
 	}
 	params, _ := op["parameters"].([]any)
 	if len(params) == 0 {
@@ -66,10 +66,10 @@ func TestLookupOperation_ApprovalList_RequiredStat(t *testing.T) {
 	}
 }
 
-func TestLookupOperation_DocumentSearch(t *testing.T) {
-	op, err := LookupOperation("document.search")
+func TestLookup_DocumentSearch(t *testing.T) {
+	op, err := Lookup("document.search")
 	if err != nil {
-		t.Fatalf("LookupOperation: %v", err)
+		t.Fatalf("Lookup: %v", err)
 	}
 	if op["method"] != "POST" {
 		t.Errorf("method = %v", op["method"])
