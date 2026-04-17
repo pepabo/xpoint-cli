@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "path": "/x/v1/service",
+  "summary": "X-point情報取得",
+  "description": "X-point のバージョンや利用できる機能、作成されたドメインが 1 つのみかの情報を取得する。\nOAuth2 認証のアクセストークン取得時にドメインコード省略可否を判断する際に使用する。\nユーザ認証なしで利用可能。\n",
+  "parameters": [],
+  "response": {
+    "type": "object",
+    "properties": {
+      "version": { "type": "string", "description": "X-point バージョン (例: 3.7.00)" },
+      "api_level": { "type": "integer", "description": "API レベル (3.1 時点では 1)" },
+      "single_domain": {
+        "type": "boolean",
+        "description": "シングルドメインフラグ: true ならドメインが 1 つのみ。OAuth2 トークン取得時のドメイン指定省略可否判定に使用。"
+      },
+      "features": {
+        "type": "array",
+        "description": "利用可能機能リスト (ライセンスや設定で無効化されている機能は含まれない)",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}
