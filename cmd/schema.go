@@ -30,6 +30,11 @@ Supported aliases map to the CLI's commands:
   document.comment.get    GET    /api/v1/documents/{docid}/comments
   document.comment.edit   PATCH  /api/v1/documents/{docid}/comments/{seq}
   document.comment.delete DELETE /api/v1/documents/{docid}/comments/{seq}
+  document.attachment.add    POST  /multiapi/v1/attachments/{docid}
+  document.attachment.list   GET   /api/v1/attachments/{docid}
+  document.attachment.get    GET   /api/v1/attachments/{docid}/{attach_seq}
+  document.attachment.update PATCH /multiapi/v1/attachments/{docid}/{attach_seq}
+  document.attachment.delete PATCH /multiapi/v1/attachments/{docid}/{attach_seq}
   query.list        GET    /api/v1/query/
   query.exec        GET    /api/v1/query/{query_code}
 

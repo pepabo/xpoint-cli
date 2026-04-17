@@ -1,0 +1,63 @@
+{
+  "method": "PATCH",
+  "path": "/multiapi/v1/attachments/{docid}/{attach_seq}",
+  "summary": "添付ファイル削除",
+  "description": "添付ファイル更新 API (PATCH /multiapi/v1/attachments/{docid}/{attach_seq}) を `delete=true` で呼び出して削除する。更新権限が必要。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    },
+    {
+      "name": "attach_seq",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "添付番号"
+    }
+  ],
+  "requestBody": {
+    "contentType": "multipart/form-data",
+    "description": "添付ファイル削除リクエスト。delete=true を送信する。\n",
+    "properties": {
+      "user_code": {
+        "type": "string",
+        "required": true,
+        "description": "ユーザコード"
+      },
+      "delete": {
+        "type": "boolean",
+        "required": true,
+        "description": "削除フラグ (true 固定)"
+      },
+      "reason": {
+        "type": "string",
+        "description": "削除理由 (電帳法データ保存対象フォームでは必須)"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "docid": {
+        "type": "integer",
+        "description": "書類ID"
+      },
+      "seq": {
+        "type": "integer",
+        "description": "添付番号"
+      },
+      "message_type": {
+        "type": "integer",
+        "description": "メッセージタイプ (0: NoError 固定)"
+      },
+      "message": {
+        "type": "string",
+        "description": "メッセージ内容"
+      }
+    }
+  }
+}

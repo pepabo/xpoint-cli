@@ -1,0 +1,82 @@
+{
+  "method": "POST",
+  "path": "/multiapi/v1/attachments/{docid}",
+  "summary": "添付ファイル追加",
+  "description": "指定された書類 ID に添付ファイルをアップロードする。multipart/form-data。更新権限が必要。\n一度に追加できるファイルは 1 つまで。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    }
+  ],
+  "requestBody": {
+    "contentType": "multipart/form-data",
+    "description": "添付ファイル追加リクエスト。required: user_code, file, file_name。\n",
+    "properties": {
+      "user_code": {
+        "type": "string",
+        "required": true,
+        "description": "ユーザコード。未登録ユーザ指定時は認証ユーザで追加される。"
+      },
+      "file": {
+        "type": "string",
+        "format": "binary",
+        "required": true,
+        "description": "アップロードファイル情報"
+      },
+      "file_name": {
+        "type": "string",
+        "required": true,
+        "description": "アップロードファイル名 (拡張子を含む)"
+      },
+      "remarks": {
+        "type": "string",
+        "description": "備考"
+      },
+      "overwrite": {
+        "type": "boolean",
+        "description": "同名ファイルを上書きするか (既定 true)"
+      },
+      "reason": {
+        "type": "string",
+        "description": "更新理由 (電帳法データ保存対象フォームで上書き時は必須)"
+      },
+      "detail_no": {
+        "type": "integer",
+        "description": "対応明細行No (電帳法添付型フォーム用、既定 0)"
+      },
+      "evidence_type": {
+        "type": "integer",
+        "description": "電帳法書類区分 (0: その他 / 1: 電子取引、既定 1)"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "docid": {
+        "type": "integer",
+        "description": "書類ID"
+      },
+      "seq": {
+        "type": "integer",
+        "description": "添付番号"
+      },
+      "message_type": {
+        "type": "integer",
+        "description": "メッセージタイプ (0: NoError 固定)"
+      },
+      "message": {
+        "type": "string",
+        "description": "メッセージ内容"
+      },
+      "detail": {
+        "type": "string",
+        "description": "指定 user_code が未登録の場合のフォールバック通知"
+      }
+    }
+  }
+}

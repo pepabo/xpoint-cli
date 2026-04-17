@@ -1,0 +1,61 @@
+{
+  "method": "GET",
+  "path": "/api/v1/attachments/{docid}",
+  "summary": "添付ファイル一覧取得",
+  "description": "指定された書類 ID の添付ファイル一覧を取得する。閲覧権限が必要。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "attachments": {
+        "type": "array",
+        "description": "添付ファイル情報 (存在しない場合は空配列)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "content_type": {
+              "type": "string",
+              "description": "ファイル種類 (MIME)"
+            },
+            "seq": {
+              "type": "integer",
+              "description": "添付番号"
+            },
+            "name": {
+              "type": "string",
+              "description": "ファイル名 (拡張子を含む)"
+            },
+            "size": {
+              "type": "integer",
+              "description": "ファイルサイズ (バイト)"
+            },
+            "remarks": {
+              "type": "string",
+              "description": "備考"
+            },
+            "detail_no": {
+              "type": "integer",
+              "description": "対応明細行No (電帳法添付型フォーム時のみ)"
+            },
+            "evidence_type": {
+              "type": "integer",
+              "description": "電帳法書類区分 (0: その他 / 1: 電子取引)"
+            },
+            "evidence_type_label": {
+              "type": "string",
+              "description": "電帳法書類区分名称"
+            }
+          }
+        }
+      }
+    }
+  }
+}
