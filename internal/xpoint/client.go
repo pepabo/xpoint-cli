@@ -278,7 +278,9 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	}
 	if debug {
 		fmt.Fprintf(os.Stderr, "[xp] <- %s (%d bytes)\n", resp.Status, len(respBody))
-		fmt.Fprintf(os.Stderr, "[xp]    %s\n", string(respBody))
+		if resp.StatusCode/100 != 2 {
+			fmt.Fprintf(os.Stderr, "[xp]    %s\n", string(respBody))
+		}
 	}
 	if resp.StatusCode/100 != 2 {
 		return fmt.Errorf("xpoint api error: %s: %s", resp.Status, string(respBody))
