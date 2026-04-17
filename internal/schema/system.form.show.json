@@ -1,0 +1,124 @@
+{
+  "method": "GET",
+  "path": "/api/v1/system/forms/{fid}",
+  "summary": "フォーム定義情報取得 (管理者)",
+  "description": "フォームを構成するフィールドの詳細情報を取得する。\n管理者ユーザで認証した場合のみフォーム定義が取得できる。\n一般ユーザで取得する場合は /api/v1/forms/{fid} (form show) を利用する。\n",
+  "parameters": [
+    {
+      "name": "fid",
+      "in": "path",
+      "required": true,
+      "type": "integer",
+      "description": "フォームID"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "form": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "フォームコード"
+          },
+          "name": {
+            "type": "string",
+            "description": "フォーム名称"
+          },
+          "max_step": {
+            "type": "integer",
+            "description": "フォーム最大ステップ数"
+          },
+          "route": {
+            "type": "array",
+            "description": "フォームルート情報 (通常フォームでは空配列)",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "ルートコード"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "ルート名称"
+                },
+                "condroute": {
+                  "type": "boolean",
+                  "description": "true: 条件付きルート / false: ユーザ選択ルート"
+                }
+              }
+            }
+          },
+          "pages": {
+            "type": "array",
+            "description": "フォームページ情報",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_no": {
+                  "type": "integer",
+                  "description": "ページ番号"
+                },
+                "form_code": {
+                  "type": "string",
+                  "description": "複数枚フォームの場合のみ出力"
+                },
+                "form_name": {
+                  "type": "string",
+                  "description": "複数枚フォームの場合のみ出力"
+                },
+                "fields": {
+                  "type": "array",
+                  "description": "フィールド情報",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "seq": {
+                        "type": "integer",
+                        "description": "シーケンス番号"
+                      },
+                      "fieldid": {
+                        "type": "string",
+                        "description": "フィールドID"
+                      },
+                      "fieldtype": {
+                        "type": "integer",
+                        "description": "フィールドタイプ"
+                      },
+                      "maxlength": {
+                        "type": "integer",
+                        "description": "フィールド最大値"
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "フィールドラベル"
+                      },
+                      "groupname": {
+                        "type": "string",
+                        "description": "グループ名称"
+                      },
+                      "arraysize": {
+                        "type": "integer",
+                        "description": "表明細数 (0なら非表明細)"
+                      },
+                      "required": {
+                        "type": "boolean",
+                        "description": "必須フィールドフラグ"
+                      },
+                      "unique": {
+                        "type": "boolean",
+                        "description": "ユニークフィールドフラグ"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
