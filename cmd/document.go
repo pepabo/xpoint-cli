@@ -469,9 +469,11 @@ type writerListEntry struct {
 	Code string `json:"code"`
 }
 
-// resolveCurrentUserCode returns the authenticated user's login ID for --me.
-// It prefers XPOINT_USER / --xpoint-user; if neither is set, it falls back to
-// GET /scim/v2/{domain_code}/Me (which requires OAuth2 and the domain code).
+// resolveCurrentUserCode returns the authenticated user's X-point user code
+// for --me. It prefers XPOINT_USER / --xpoint-user; if neither is set, it
+// falls back to GET /scim/v2/{domain_code}/Me and reads the atled SCIM
+// extension's userCode (not userName — that's the login name, while the
+// writer_list API expects the numeric user code).
 func resolveCurrentUserCode(ctx context.Context, client *xpoint.Client) (string, error) {
 	if u := pick(flagUser, "XPOINT_USER"); u != "" {
 		return u, nil
@@ -484,10 +486,10 @@ func resolveCurrentUserCode(ctx context.Context, client *xpoint.Client) (string,
 	if err != nil {
 		return "", fmt.Errorf("resolve --me via /scim/v2/%s/Me: %w", domain, err)
 	}
-	if info.UserName == "" {
-		return "", fmt.Errorf("resolve --me: userName is empty in /scim/v2/%s/Me response", domain)
+	if info.AtledExt.UserCode == "" {
+		return "", fmt.Errorf("resolve --me: userCode is empty in /scim/v2/%s/Me response (atled SCIM extension missing)", domain)
 	}
-	return info.UserName, nil
+	return info.AtledExt.UserCode, nil
 }
 
 // buildSearchBodyFromFlags converts --title / --form-* / --writer* / --me /

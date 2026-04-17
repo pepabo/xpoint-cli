@@ -368,7 +368,7 @@ func TestGetSelfInfo(t *testing.T) {
 			t.Errorf("Accept = %q, want application/scim+json", got)
 		}
 		w.Header().Set("Content-Type", "application/scim+json")
-		_, _ = w.Write([]byte(`{"id":"100","userName":"u001","displayName":"田中"}`))
+		_, _ = w.Write([]byte(`{"id":"100","userName":"u001","displayName":"田中","urn:atled:scim:schemas:1.0:User":{"userCode":"326"}}`))
 	}))
 	defer srv.Close()
 
@@ -379,6 +379,9 @@ func TestGetSelfInfo(t *testing.T) {
 	}
 	if info.UserName != "u001" || info.ID != "100" || info.DisplayName != "田中" {
 		t.Errorf("info = %+v", info)
+	}
+	if info.AtledExt.UserCode != "326" {
+		t.Errorf("AtledExt.UserCode = %q, want 326", info.AtledExt.UserCode)
 	}
 }
 

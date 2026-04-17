@@ -359,6 +359,13 @@ type SelfInfo struct {
 	ID          string `json:"id"`
 	UserName    string `json:"userName"`
 	DisplayName string `json:"displayName"`
+	// UserCode is the X-point user code from the atled SCIM extension
+	// (urn:atled:scim:schemas:1.0:User.userCode). It is the identifier used
+	// in writer_list and other X-point APIs — distinct from userName, which
+	// is the login name.
+	AtledExt struct {
+		UserCode string `json:"userCode"`
+	} `json:"urn:atled:scim:schemas:1.0:User"`
 }
 
 // GetSelfInfo calls GET /scim/v2/{domain_code}/Me to fetch the authenticated
@@ -473,6 +480,9 @@ func (c *Client) doAccept(ctx context.Context, method, path string, q url.Values
 				val = redactToken(val)
 			}
 			fmt.Fprintf(os.Stderr, "[xp]   %s: %s\n", k, val)
+		}
+		if len(body) > 0 {
+			fmt.Fprintf(os.Stderr, "[xp]   body: %s\n", string(body))
 		}
 	}
 
