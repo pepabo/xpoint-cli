@@ -18,6 +18,8 @@ func TestAliases_Sorted(t *testing.T) {
 		"document.update",
 		"form.list",
 		"form.show",
+		"query.exec",
+		"query.list",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("aliases = %v", got)
@@ -138,6 +140,40 @@ func TestLookup_DocumentDownload(t *testing.T) {
 	}
 	if op["path"] != "/api/v1/documents/{docid}/pdf" {
 		t.Errorf("path = %v", op["path"])
+	}
+}
+
+func TestLookup_QueryList(t *testing.T) {
+	op, err := Lookup("query.list")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "GET" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/query/" {
+		t.Errorf("path = %v", op["path"])
+	}
+}
+
+func TestLookup_QueryExec(t *testing.T) {
+	op, err := Lookup("query.exec")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "GET" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/query/{query_code}" {
+		t.Errorf("path = %v", op["path"])
+	}
+	params, _ := op["parameters"].([]any)
+	if len(params) < 1 {
+		t.Fatalf("parameters = %v", params)
+	}
+	first, _ := params[0].(map[string]any)
+	if first["name"] != "query_code" || first["required"] != true {
+		t.Errorf("first param = %v", first)
 	}
 }
 

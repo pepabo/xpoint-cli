@@ -1,0 +1,50 @@
+{
+  "method": "GET",
+  "path": "/api/v1/query/{query_code}",
+  "summary": "クエリ取得／実行",
+  "description": "認証ユーザーが閲覧できるクエリをひとつ選択し、その設定情報を取得する。exec_flg=true の場合は実行結果も返す。rows / offset で一覧クエリのページングが可能。抽出条件設定にしたがって絞り込まれた状態で返る。\n",
+  "parameters": [
+    {
+      "name": "query_code",
+      "in": "path",
+      "type": "string",
+      "required": true,
+      "description": "クエリコード"
+    },
+    {
+      "name": "exec_flg",
+      "in": "query",
+      "type": "boolean",
+      "required": false,
+      "description": "true: クエリ実行 (定義と実行結果) / false: 定義のみ。既定は false。"
+    },
+    {
+      "name": "rows",
+      "in": "query",
+      "type": "integer",
+      "required": false,
+      "description": "出力行数。既定は 500。1〜10000 で指定可能。"
+    },
+    {
+      "name": "offset",
+      "in": "query",
+      "type": "integer",
+      "required": false,
+      "description": "オフセット値。一覧クエリのみ有効。既定は 0。"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "description": "クエリ情報および実行結果。レスポンス形状は query_type によって異なる (list / summary / cross)。",
+    "properties": {
+      "query": {
+        "type": "object",
+        "description": "クエリ定義 (query_id, query_code, query_name, query_type, form_count, fid/forms, csv_filename, graph など)"
+      },
+      "exec_result": {
+        "type": "object",
+        "description": "実行結果。exec_flg=true の場合に返る。list の場合は data: [{docid, record: {...}}] の形。summary/cross の場合はヘッダ・行情報が含まれる。"
+      }
+    }
+  }
+}

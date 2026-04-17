@@ -88,6 +88,18 @@ xp approval list --filter 'cr_dt between "2023-01-01" and "2023-12-31"'
 
 `--stat` の値は X-point のマニュアル参照（10=承認待ち、20=通知、30=下書き等、40=状況確認、50=承認完了）。
 
+### クエリ一覧 / 実行
+
+```sh
+xp query list                           # 利用可能なクエリを一覧表示
+xp query list --jq '.query_groups[].queries[].query_code'
+
+xp query exec query01                   # クエリを実行して定義と結果を取得
+xp query exec query01 --no-run          # 定義のみ取得（実行しない）
+xp query exec query01 --rows 100 --offset 0
+xp query exec query01 --jq '.exec_result.data'
+```
+
 ### ドキュメント検索
 
 ```sh
