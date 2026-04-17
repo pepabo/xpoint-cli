@@ -19,6 +19,10 @@ var (
 	docSearchPage   int
 	docSearchOutput string
 	docSearchJQ     string
+
+	docCreateBody   string
+	docCreateOutput string
+	docCreateJQ     string
 )
 
 var documentCmd = &cobra.Command{
@@ -40,9 +44,26 @@ If --body is omitted, an empty object is sent (matches all documents).`,
 	RunE: runDocumentSearch,
 }
 
+var documentCreateCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a document",
+	Long: `Create a document via POST /api/v1/documents.
+
+The request body is provided with --body, which accepts one of:
+  - inline JSON string                    (e.g. --body '{"route_code":"r1",...}')
+  - a path to a JSON file                 (e.g. --body ./doc.json)
+  - "-" to read the body from stdin       (e.g. --body -)
+
+The body must contain route_code, datas, and a form identifier
+(form_code or form_name). See "xp schema document.create" for shape.`,
+	RunE: runDocumentCreate,
+}
+
 func init() {
 	rootCmd.AddCommand(documentCmd)
 	documentCmd.AddCommand(documentSearchCmd)
+	documentCmd.AddCommand(documentCreateCmd)
+
 	f := documentSearchCmd.Flags()
 	f.StringVar(&docSearchBody, "body", "", "search condition JSON: inline, file path, or - for stdin")
 	f.IntVar(&docSearchSize, "size", 0, "number of items per page (0 = omit, server default 50; max 1000)")
@@ -50,6 +71,11 @@ func init() {
 	f.IntVar(&docSearchPage, "page", 0, "result page (0 = omit)")
 	f.StringVarP(&docSearchOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
 	f.StringVar(&docSearchJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	cf := documentCreateCmd.Flags()
+	cf.StringVar(&docCreateBody, "body", "", "request body JSON: inline, file path, or - for stdin (required)")
+	cf.StringVarP(&docCreateOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	cf.StringVar(&docCreateJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
 }
 
 func runDocumentSearch(cmd *cobra.Command, args []string) error {
@@ -92,6 +118,34 @@ func runDocumentSearch(cmd *cobra.Command, args []string) error {
 				it.DocID, it.Form.Name, it.Writer, it.WriteDatetime, it.Step, it.Stat, it.Title1,
 			)
 		}
+		return nil
+	})
+}
+
+func runDocumentCreate(cmd *cobra.Command, args []string) error {
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+
+	bodyBytes, err := loadSearchBody(docCreateBody)
+	if err != nil {
+		return err
+	}
+	if len(bodyBytes) == 0 {
+		return fmt.Errorf("--body is required for document create")
+	}
+
+	res, err := client.CreateDocument(cmd.Context(), bodyBytes)
+	if err != nil {
+		return err
+	}
+
+	return render(res, resolveOutputFormat(docCreateOutput), docCreateJQ, func() error {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer w.Flush()
+		fmt.Fprintln(w, "DOCID\tMESSAGE_TYPE\tMESSAGE")
+		fmt.Fprintf(w, "%d\t%d\t%s\n", res.DocID, res.MessageType, res.Message)
 		return nil
 	})
 }

@@ -68,6 +68,18 @@ func TestLoadSearchBody_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestRunDocumentCreate_RequiresBody(t *testing.T) {
+	docCreateBody = ""
+	t.Setenv("XPOINT_SUBDOMAIN", "acme")
+	t.Setenv("XPOINT_API_ACCESS_TOKEN", "tok")
+	t.Setenv("XPOINT_GENERIC_API_TOKEN", "")
+
+	err := runDocumentCreate(documentCreateCmd, nil)
+	if err == nil || !strings.Contains(err.Error(), "--body is required") {
+		t.Errorf("err = %v", err)
+	}
+}
+
 func TestLoadSearchBody_Stdin(t *testing.T) {
 	orig := os.Stdin
 	t.Cleanup(func() { os.Stdin = orig })

@@ -229,6 +229,26 @@ func (c *Client) SearchDocuments(ctx context.Context, p SearchDocumentsParams, b
 	return &out, nil
 }
 
+type CreateDocumentResponse struct {
+	DocID       int    `json:"docid"`
+	MessageType int    `json:"message_type"`
+	Message     string `json:"message"`
+}
+
+// CreateDocument calls POST /api/v1/documents.
+// body is sent as the raw JSON request body; it must contain route_code,
+// datas, and a form identifier (form_code or form_name).
+func (c *Client) CreateDocument(ctx context.Context, body json.RawMessage) (*CreateDocumentResponse, error) {
+	if len(body) == 0 {
+		return nil, fmt.Errorf("request body is required for document creation")
+	}
+	var out CreateDocumentResponse
+	if err := c.do(ctx, http.MethodPost, "/api/v1/documents", nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // do executes an HTTP request and decodes a JSON response into out.
 func (c *Client) do(ctx context.Context, method, path string, q url.Values, body []byte, out any) error {
 	u := c.baseURL + path

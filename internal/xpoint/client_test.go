@@ -217,6 +217,50 @@ func TestSearchDocuments_PostBodyAndQuery(t *testing.T) {
 	}
 }
 
+func TestCreateDocument_PostsBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s, want POST", r.Method)
+		}
+		if r.URL.Path != "/api/v1/documents" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Errorf("Content-Type = %q", got)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var decoded map[string]any
+		if err := json.Unmarshal(body, &decoded); err != nil {
+			t.Fatalf("body not JSON: %v (%s)", err, string(body))
+		}
+		if decoded["route_code"] != "r1" {
+			t.Errorf("body.route_code = %v", decoded["route_code"])
+		}
+		if decoded["form_code"] != "f1" {
+			t.Errorf("body.form_code = %v", decoded["form_code"])
+		}
+		_, _ = w.Write([]byte(`{"docid":999,"message_type":3,"message":"書類が提出されました (ID = 999)"}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	res, err := c.CreateDocument(context.Background(), json.RawMessage(`{"form_code":"f1","route_code":"r1","datas":[]}`))
+	if err != nil {
+		t.Fatalf("CreateDocument: %v", err)
+	}
+	if res.DocID != 999 || res.MessageType != 3 || res.Message == "" {
+		t.Errorf("unexpected response: %+v", res)
+	}
+}
+
+func TestCreateDocument_RequiresBody(t *testing.T) {
+	c := NewClient("unused", Auth{AccessToken: "t"})
+	_, err := c.CreateDocument(context.Background(), nil)
+	if err == nil || !strings.Contains(err.Error(), "body is required") {
+		t.Errorf("err = %v", err)
+	}
+}
+
 func TestSearchDocuments_DefaultBodyIsEmptyObject(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
