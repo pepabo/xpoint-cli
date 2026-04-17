@@ -356,6 +356,52 @@ func TestDocumentURL(t *testing.T) {
 	}
 }
 
+func TestGetDocumentStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/api/v1/documents/999/status" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if r.URL.Query().Has("history") {
+			t.Errorf("history query should be omitted, got %q", r.URL.Query().Get("history"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"document":{"docid":999,"status":{"code":1,"name":"承認中"}}}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	raw, err := c.GetDocumentStatus(context.Background(), 999, false)
+	if err != nil {
+		t.Fatalf("GetDocumentStatus: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("raw not JSON: %v (%s)", err, string(raw))
+	}
+	doc, _ := decoded["document"].(map[string]any)
+	if doc["docid"].(float64) != 999 {
+		t.Errorf("docid = %v", doc["docid"])
+	}
+}
+
+func TestGetDocumentStatus_WithHistory(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("history"); got != "true" {
+			t.Errorf("history = %q, want true", got)
+		}
+		_, _ = w.Write([]byte(`{"document":{"docid":1}}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	if _, err := c.GetDocumentStatus(context.Background(), 1, true); err != nil {
+		t.Fatalf("GetDocumentStatus: %v", err)
+	}
+}
+
 func TestDownloadPDF(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

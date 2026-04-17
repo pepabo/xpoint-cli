@@ -97,6 +97,14 @@ cat search.json | xp document search --body -
 xp document search --size 100 --page 2
 ```
 
+### ドキュメントの承認状況取得
+
+```sh
+xp document status 266248                   # 最新版の承認状況（JSON）
+xp document status 266248 --history         # 全バージョンの承認履歴も含める
+xp document status 266248 --jq '.document.status.name'
+```
+
 ### ドキュメントのPDFダウンロード
 
 ```sh
