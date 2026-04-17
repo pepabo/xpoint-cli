@@ -147,6 +147,39 @@ func TestListAvailableForms(t *testing.T) {
 	}
 }
 
+func TestGetFormDetail(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/api/v1/forms/412" {
+			t.Errorf("path = %s, want /api/v1/forms/412", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"form":{"code":"TORIHIKISAKI_a","name":"取引先審査","max_step":3,"route":[],"pages":[{"page_no":1,"fields":[{"seq":1,"fieldid":"integerfield4","fieldtype":11,"maxlength":10,"label":"品目","arraysize":0,"required":true,"unique":false}]}]}}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	got, err := c.GetFormDetail(context.Background(), 412)
+	if err != nil {
+		t.Fatalf("GetFormDetail: %v", err)
+	}
+	if got.Form.Code != "TORIHIKISAKI_a" {
+		t.Errorf("code = %q", got.Form.Code)
+	}
+	if got.Form.MaxStep != 3 {
+		t.Errorf("max_step = %d", got.Form.MaxStep)
+	}
+	if len(got.Form.Pages) != 1 || len(got.Form.Pages[0].Fields) != 1 {
+		t.Fatalf("pages = %+v", got.Form.Pages)
+	}
+	f := got.Form.Pages[0].Fields[0]
+	if f.FieldID != "integerfield4" || f.FieldType != 11 || !f.Required {
+		t.Errorf("field = %+v", f)
+	}
+}
+
 func TestListApprovals_QueryAndDecode(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/approvals" {
@@ -308,6 +341,18 @@ func TestDo_AppliesAuthHeader(t *testing.T) {
 	c.http = srv.Client()
 	if _, err := c.ListAvailableForms(context.Background()); err != nil {
 		t.Fatalf("ListAvailableForms: %v", err)
+	}
+}
+
+func TestDocumentURL(t *testing.T) {
+	c := NewClient("acme", Auth{AccessToken: "t"})
+	got := c.DocumentURL(266248)
+	want := "https://acme.atledcloud.jp/xpoint/form.do?act=view&docid=266248"
+	if got != want {
+		t.Errorf("DocumentURL = %q, want %q", got, want)
+	}
+	if c.DocumentURL(0) != "" {
+		t.Errorf("DocumentURL(0) should be empty")
 	}
 }
 

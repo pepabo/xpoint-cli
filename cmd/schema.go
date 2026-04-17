@@ -17,6 +17,7 @@ var schemaCmd = &cobra.Command{
 
 Supported aliases map to the CLI's commands:
   form.list         GET    /api/v1/forms
+  form.show         GET    /api/v1/forms/{fid}
   approval.list     GET    /api/v1/approvals
   document.search   POST   /api/v1/search/documents
   document.create   POST   /api/v1/documents

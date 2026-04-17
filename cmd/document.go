@@ -189,6 +189,13 @@ func runDocumentSearch(cmd *cobra.Command, args []string) error {
 	})
 }
 
+type documentCreateOutputView struct {
+	DocID       int    `json:"docid"`
+	MessageType int    `json:"message_type"`
+	Message     string `json:"message"`
+	URL         string `json:"url,omitempty"`
+}
+
 func runDocumentCreate(cmd *cobra.Command, args []string) error {
 	client, err := newClientFromFlags(cmd.Context())
 	if err != nil {
@@ -208,11 +215,18 @@ func runDocumentCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return render(res, resolveOutputFormat(docCreateOutput), docCreateJQ, func() error {
+	view := documentCreateOutputView{
+		DocID:       res.DocID,
+		MessageType: res.MessageType,
+		Message:     res.Message,
+		URL:         client.DocumentURL(res.DocID),
+	}
+
+	return render(&view, resolveOutputFormat(docCreateOutput), docCreateJQ, func() error {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		defer w.Flush()
-		fmt.Fprintln(w, "DOCID\tMESSAGE_TYPE\tMESSAGE")
-		fmt.Fprintf(w, "%d\t%d\t%s\n", res.DocID, res.MessageType, res.Message)
+		fmt.Fprintln(w, "DOCID\tMESSAGE_TYPE\tMESSAGE\tURL")
+		fmt.Fprintf(w, "%d\t%d\t%s\t%s\n", view.DocID, view.MessageType, view.Message, view.URL)
 		return nil
 	})
 }

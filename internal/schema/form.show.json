@@ -1,0 +1,124 @@
+{
+  "method": "GET",
+  "path": "/api/v1/forms/{fid}",
+  "summary": "フォーム定義情報取得",
+  "description": "フォームを構成するフィールドの詳細情報 (フィールドID, 型, 必須, 表明細サイズ など) を取得する。\n一般ユーザで実行可能。\n",
+  "parameters": [
+    {
+      "name": "fid",
+      "in": "path",
+      "required": true,
+      "type": "integer",
+      "description": "フォームID (form list の form[].id)"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "form": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "フォームコード"
+          },
+          "name": {
+            "type": "string",
+            "description": "フォーム名称"
+          },
+          "max_step": {
+            "type": "integer",
+            "description": "フォーム最大ステップ数"
+          },
+          "route": {
+            "type": "array",
+            "description": "フォームルート情報 (通常フォームでは空配列)",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "ルートコード"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "ルート名称"
+                },
+                "condroute": {
+                  "type": "boolean",
+                  "description": "true: 条件付きルート / false: ユーザ選択ルート"
+                }
+              }
+            }
+          },
+          "pages": {
+            "type": "array",
+            "description": "フォームページ情報",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_no": {
+                  "type": "integer",
+                  "description": "ページ番号"
+                },
+                "form_code": {
+                  "type": "string",
+                  "description": "複数枚フォームの場合のみ出力"
+                },
+                "form_name": {
+                  "type": "string",
+                  "description": "複数枚フォームの場合のみ出力"
+                },
+                "fields": {
+                  "type": "array",
+                  "description": "フィールド情報 (spec は object だが実体は配列)",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "seq": {
+                        "type": "integer",
+                        "description": "シーケンス番号"
+                      },
+                      "fieldid": {
+                        "type": "string",
+                        "description": "フィールドID (document create の fields キーに使用)"
+                      },
+                      "fieldtype": {
+                        "type": "integer",
+                        "description": "フィールドタイプ (9:文字 / 10:数値 / 11:整数 / 12:テキストエリア / 13:パスワード / 15:ラジオ / 16:チェックボックス / 17:コンボ / 18:リストボックス / 25:西暦 / 26:月 / 27:日 / 34:日時 / 99:不可視 など)"
+                      },
+                      "maxlength": {
+                        "type": "integer",
+                        "description": "フィールド最大値"
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "フィールドラベル"
+                      },
+                      "groupname": {
+                        "type": "string",
+                        "description": "グループ名称"
+                      },
+                      "arraysize": {
+                        "type": "integer",
+                        "description": "表明細数 (0なら非表明細)"
+                      },
+                      "required": {
+                        "type": "boolean",
+                        "description": "必須フィールドフラグ"
+                      },
+                      "unique": {
+                        "type": "boolean",
+                        "description": "ユニークフィールドフラグ"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

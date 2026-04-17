@@ -89,6 +89,63 @@ func (c *Client) ListAvailableForms(ctx context.Context) (*FormsListResponse, er
 	return &out, nil
 }
 
+type FormField struct {
+	Seq       int    `json:"seq"`
+	FieldID   string `json:"fieldid"`
+	FieldType int    `json:"fieldtype"`
+	MaxLength int    `json:"maxlength"`
+	Label     string `json:"label"`
+	GroupName string `json:"groupname"`
+	ArraySize int    `json:"arraysize"`
+	Required  bool   `json:"required"`
+	Unique    bool   `json:"unique"`
+}
+
+type FormDetailPage struct {
+	PageNo   int         `json:"page_no"`
+	FormCode string      `json:"form_code,omitempty"`
+	FormName string      `json:"form_name,omitempty"`
+	Fields   []FormField `json:"fields"`
+}
+
+type FormDetailRoute struct {
+	Code      string `json:"code,omitempty"`
+	Name      string `json:"name"`
+	Condroute bool   `json:"condroute"`
+}
+
+type FormDetail struct {
+	Code    string            `json:"code"`
+	Name    string            `json:"name"`
+	MaxStep int               `json:"max_step"`
+	Route   []FormDetailRoute `json:"route"`
+	Pages   []FormDetailPage  `json:"pages"`
+}
+
+type FormDetailResponse struct {
+	Form FormDetail `json:"form"`
+}
+
+// DocumentURL returns the web URL for a document, suitable for opening
+// in a browser. The server redirects to the right form when only docid
+// is provided.
+func (c *Client) DocumentURL(docID int) string {
+	if docID <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s/form.do?act=view&docid=%d", c.baseURL, docID)
+}
+
+// GetFormDetail calls GET /api/v1/forms/{fid} to fetch field definitions.
+func (c *Client) GetFormDetail(ctx context.Context, formID int) (*FormDetailResponse, error) {
+	path := fmt.Sprintf("/api/v1/forms/%d", formID)
+	var out FormDetailResponse
+	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 type Approval struct {
 	DocID            int      `json:"docid"`
 	Hidden           *bool    `json:"hidden,omitempty"`
