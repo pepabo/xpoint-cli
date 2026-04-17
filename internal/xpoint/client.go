@@ -1,0 +1,264 @@
+package xpoint
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"time"
+)
+
+type Client struct {
+	baseURL string
+	auth    Auth
+	http    *http.Client
+}
+
+// Auth holds X-point credentials. Exactly one of GenericAPIToken or AccessToken must be set.
+type Auth struct {
+	// GenericAPIToken auth: sent as X-ATLED-Generic-API-Token.
+	DomainCode      string
+	User            string
+	GenericAPIToken string
+
+	// OAuth2 access token: sent as Authorization: Bearer.
+	AccessToken string
+}
+
+func (a Auth) apply(req *http.Request) {
+	if a.AccessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+a.AccessToken)
+		return
+	}
+	raw := fmt.Sprintf("%s:%s:%s", a.DomainCode, a.User, a.GenericAPIToken)
+	req.Header.Set("X-ATLED-Generic-API-Token", base64.StdEncoding.EncodeToString([]byte(raw)))
+}
+
+func NewClient(subdomain string, auth Auth) *Client {
+	return &Client{
+		baseURL: fmt.Sprintf("https://%s.atledcloud.jp/xpoint", subdomain),
+		auth:    auth,
+		http:    &http.Client{Timeout: 120 * time.Second},
+	}
+}
+
+type Route struct {
+	ID   int    `json:"id"`
+	Code string `json:"code,omitempty"`
+	Name string `json:"name"`
+}
+
+type Form struct {
+	ID    int     `json:"id"`
+	Name  string  `json:"name"`
+	Code  string  `json:"code"`
+	Route []Route `json:"route,omitempty"`
+}
+
+type FormGroup struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Form []Form `json:"form"`
+}
+
+type FormsListResponse struct {
+	FormGroup []FormGroup `json:"form_group"`
+}
+
+// ListAvailableForms calls GET /api/v1/forms (ユーザー別API: 利用可能フォーム一覧取得).
+func (c *Client) ListAvailableForms(ctx context.Context) (*FormsListResponse, error) {
+	var out FormsListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/forms", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type Approval struct {
+	DocID            int      `json:"docid"`
+	Hidden           *bool    `json:"hidden,omitempty"`
+	Attachment       bool     `json:"attachment"`
+	Comment          bool     `json:"comment"`
+	Title1           string   `json:"title1"`
+	Title2           string   `json:"title2"`
+	FormName         string   `json:"form_name"`
+	Status           string   `json:"status"`
+	DisplayStatus    string   `json:"display_status"`
+	ApplyDatetime    string   `json:"apply_datetime"`
+	ApplyUser        string   `json:"apply_user"`
+	ApprovalUser     []string `json:"approval_user"`
+	LastAprvDatetime string   `json:"lastaprv_datetime"`
+}
+
+type ApprovalsListResponse struct {
+	TotalCount   int        `json:"total_count"`
+	ApprovalList []Approval `json:"approval_list"`
+}
+
+// ApprovalsListParams holds query parameters for GET /api/v1/approvals.
+// Stat is required. Zero values for *int / string / *bool mean "omit".
+type ApprovalsListParams struct {
+	Stat          int     // required
+	FormGroupID   *int    // fgid
+	FormID        *int    // fid
+	Step          *int    // step
+	RecordNo      *int    // record_no
+	GetLine       *int    // get_line
+	ProxyUser     string  // proxy_user
+	Filter        string  // filter
+	ShowHiddenDoc *bool   // show_hidden_doc
+}
+
+func (p ApprovalsListParams) query() url.Values {
+	v := url.Values{}
+	v.Set("stat", strconv.Itoa(p.Stat))
+	if p.FormGroupID != nil {
+		v.Set("fgid", strconv.Itoa(*p.FormGroupID))
+	}
+	if p.FormID != nil {
+		v.Set("fid", strconv.Itoa(*p.FormID))
+	}
+	if p.Step != nil {
+		v.Set("step", strconv.Itoa(*p.Step))
+	}
+	if p.RecordNo != nil {
+		v.Set("record_no", strconv.Itoa(*p.RecordNo))
+	}
+	if p.GetLine != nil {
+		v.Set("get_line", strconv.Itoa(*p.GetLine))
+	}
+	if p.ProxyUser != "" {
+		v.Set("proxy_user", p.ProxyUser)
+	}
+	if p.Filter != "" {
+		v.Set("filter", p.Filter)
+	}
+	if p.ShowHiddenDoc != nil {
+		v.Set("show_hidden_doc", strconv.FormatBool(*p.ShowHiddenDoc))
+	}
+	return v
+}
+
+// ListApprovals calls GET /api/v1/approvals.
+func (c *Client) ListApprovals(ctx context.Context, p ApprovalsListParams) (*ApprovalsListResponse, error) {
+	var out ApprovalsListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/approvals", p.query(), nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type SearchForm struct {
+	ID   int    `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+type SearchRoute struct {
+	Code string `json:"code,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+
+type SearchItem struct {
+	DocID            int         `json:"docid"`
+	HasAttachments   bool        `json:"has_attachments"`
+	HasComments      bool        `json:"has_comments"`
+	Title1           string      `json:"title1"`
+	Title2           string      `json:"title2"`
+	Form             SearchForm  `json:"form"`
+	Route            SearchRoute `json:"route"`
+	Step             int         `json:"step"`
+	Stat             int         `json:"stat"`
+	WriteDatetime    string      `json:"write_datetime"`
+	UpdateDatetime   string      `json:"update_datetime"`
+	Writer           string      `json:"writer"`
+	CurrentApprovers []string    `json:"current_approvers"`
+	URL              string      `json:"url"`
+}
+
+type SearchDocumentsResponse struct {
+	TotalCount int          `json:"total_count"`
+	Items      []SearchItem `json:"items"`
+}
+
+type SearchDocumentsParams struct {
+	Size   *int
+	Offset *int
+	Page   *int
+}
+
+func (p SearchDocumentsParams) query() url.Values {
+	v := url.Values{}
+	if p.Size != nil {
+		v.Set("size", strconv.Itoa(*p.Size))
+	}
+	if p.Offset != nil {
+		v.Set("offset", strconv.Itoa(*p.Offset))
+	}
+	if p.Page != nil {
+		v.Set("page", strconv.Itoa(*p.Page))
+	}
+	return v
+}
+
+// SearchDocuments calls POST /api/v1/search/documents.
+// body is sent as the raw JSON request body; pass nil or {} to match all documents.
+func (c *Client) SearchDocuments(ctx context.Context, p SearchDocumentsParams, body json.RawMessage) (*SearchDocumentsResponse, error) {
+	if len(body) == 0 {
+		body = json.RawMessage("{}")
+	}
+	var out SearchDocumentsResponse
+	if err := c.do(ctx, http.MethodPost, "/api/v1/search/documents", p.query(), body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// do executes an HTTP request and decodes a JSON response into out.
+func (c *Client) do(ctx context.Context, method, path string, q url.Values, body []byte, out any) error {
+	u := c.baseURL + path
+	if len(q) > 0 {
+		u += "?" + q.Encode()
+	}
+
+	var reqBody io.Reader
+	if body != nil {
+		reqBody = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, u, reqBody)
+	if err != nil {
+		return err
+	}
+	c.auth.apply(req)
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read response body: %w", err)
+	}
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("xpoint api error: %s: %s", resp.Status, string(respBody))
+	}
+	if out == nil {
+		return nil
+	}
+	if err := json.Unmarshal(respBody, out); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	return nil
+}
