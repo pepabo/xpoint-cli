@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
@@ -48,12 +47,12 @@ func runMe(cmd *cobra.Command, args []string) error {
 	}
 
 	return render(info, resolveOutputFormat(meOutput), meJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintf(w, "user_code:\t%s\n", info.AtledExt.UserCode)
-		fmt.Fprintf(w, "user_name:\t%s\n", info.UserName)
-		fmt.Fprintf(w, "display_name:\t%s\n", info.DisplayName)
-		fmt.Fprintf(w, "scim_id:\t%s\n", info.ID)
+		w := newList(os.Stdout)
+		w.AddRow("user_code:", info.AtledExt.UserCode)
+		w.AddRow("user_name:", info.UserName)
+		w.AddRow("display_name:", info.DisplayName)
+		w.AddRow("scim_id:", info.ID)
+		w.Print()
 		return nil
 	})
 }

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/pepabo/xpoint-cli/internal/xpoint"
 	"github.com/spf13/cobra"
@@ -219,12 +218,11 @@ func runDocumentAttachmentList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	return render(res, resolveOutputFormat(docAttachListOutput), docAttachListJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "SEQ\tNAME\tSIZE\tCONTENT_TYPE\tREMARKS")
+		w := newTable(os.Stdout, "SEQ", "NAME", "SIZE", "CONTENT_TYPE", "REMARKS")
 		for _, a := range res.Attachments {
-			fmt.Fprintf(w, "%d\t%s\t%d\t%s\t%s\n", a.Seq, a.Name, a.Size, a.ContentType, a.Remarks)
+			w.AddRow(a.Seq, a.Name, a.Size, a.ContentType, a.Remarks)
 		}
+		w.Print()
 		return nil
 	})
 }
@@ -338,10 +336,9 @@ func runDocumentAttachmentDelete(cmd *cobra.Command, args []string) error {
 }
 
 func renderAttachmentMutation(res *xpoint.AttachmentMutationResponse) error {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
-	fmt.Fprintln(w, "DOCID\tSEQ\tMESSAGE_TYPE\tMESSAGE\tDETAIL")
-	fmt.Fprintf(w, "%d\t%d\t%d\t%s\t%s\n", res.DocID, res.Seq, res.MessageType, res.Message, res.Detail)
+	w := newTable(os.Stdout, "DOCID", "SEQ", "MESSAGE_TYPE", "MESSAGE", "DETAIL")
+	w.AddRow(res.DocID, res.Seq, res.MessageType, res.Message, res.Detail)
+	w.Print()
 	return nil
 }
 
