@@ -2,6 +2,5 @@
 	vPrefix = true
 	releaseBranch = main
 	versionFile = cmd/root.go
-	release = true
 	majorLabels = tagpr:major
 	minorLabels = tagpr:minor
