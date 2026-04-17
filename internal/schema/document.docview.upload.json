@@ -1,0 +1,62 @@
+{
+  "method": "POST",
+  "path": "/multiapi/v1/documents/docview",
+  "summary": "新規書類・関連書類作成 (HTMLビュー取得・マルチパート)",
+  "description": "書類ビューのフィールドに事前入力する値、および事前添付するファイル (最大1つ) を multipart/form-data で指定できる書類ビュー取得API。GETメソッド版と同様にHTMLを返す。",
+  "requestBody": {
+    "contentType": "multipart/form-data",
+    "type": "object",
+    "required": ["routecd"],
+    "properties": {
+      "fcd": {
+        "type": "string",
+        "description": "フォームコード (fcd か formname のいずれかを指定)"
+      },
+      "formname": {
+        "type": "string",
+        "description": "フォーム名称"
+      },
+      "routecd": {
+        "type": "string",
+        "description": "承認ルートコード (必須)"
+      },
+      "fromdocid": {
+        "type": "integer",
+        "description": "関連元書類ID"
+      },
+      "proxy_user": {
+        "type": "string",
+        "description": "代理申請者ユーザCD"
+      },
+      "datas": {
+        "type": "string",
+        "description": "書類ビュー表示時にフィールドに事前入力する書類データ (フォーム構成により異なる)"
+      },
+      "file": {
+        "type": "string",
+        "format": "binary",
+        "description": "事前添付ファイル (最大1つ)"
+      },
+      "file_name": {
+        "type": "string",
+        "description": "事前添付ファイルのファイル名 (拡張子含む)"
+      },
+      "remarks": {
+        "type": "string",
+        "description": "事前添付ファイルの備考"
+      },
+      "detail_no": {
+        "type": "integer",
+        "description": "アップロードファイル対応明細行No (電帳法対応オプションの添付型フォームで指定)"
+      },
+      "evidence_type": {
+        "type": "integer",
+        "description": "電帳法書類区分 0:その他 / 1:電子取引 (デフォルト 1)"
+      }
+    }
+  },
+  "response": {
+    "contentType": "text/html",
+    "description": "書類ビューHTML"
+  }
+}

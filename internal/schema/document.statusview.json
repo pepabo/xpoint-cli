@@ -1,0 +1,19 @@
+{
+  "method": "GET",
+  "path": "/api/v1/documents/{docid}/statusview",
+  "summary": "承認進捗状況表示 (HTMLビュー取得)",
+  "description": "指定された書類IDの承認進捗状況を表示するためのHTML一式を取得する。取得したHTMLは X-point の承認状況を表す画面とほぼ同じ内容で、Webkit 等で表示する際に利用する。",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    }
+  ],
+  "response": {
+    "contentType": "text/html",
+    "description": "承認進捗状況ビューHTML"
+  }
+}
