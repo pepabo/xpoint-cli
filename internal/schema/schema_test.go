@@ -8,6 +8,7 @@ import (
 func TestAliases_Sorted(t *testing.T) {
 	got := Aliases()
 	want := []string{
+		"adminrole",
 		"approval.hidden",
 		"approval.list",
 		"approval.wait",
@@ -33,9 +34,11 @@ func TestAliases_Sorted(t *testing.T) {
 		"document.update",
 		"form.list",
 		"form.show",
+		"proxy",
 		"query.exec",
 		"query.graph",
 		"query.list",
+		"service",
 		"system.form.list",
 		"system.form.show",
 		"system.master.data",

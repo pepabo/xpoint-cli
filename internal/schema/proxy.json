@@ -1,0 +1,31 @@
+{
+  "method": "GET",
+  "path": "/api/v1/proxy",
+  "summary": "代理権限情報取得",
+  "description": "認証ユーザが代理を許可されている、ユーザ、ワークフロー操作 (申請・承認)、フォーム・ステップに関わる情報を取得する。\n代理ユーザ情報を API 呼び出し時に指定することで、許可された範囲で代理者として情報を取得・操作できる。\n",
+  "parameters": [],
+  "response": {
+    "type": "object",
+    "properties": {
+      "proxy": {
+        "type": "array",
+        "description": "代理権限リスト (設定がない場合は空配列)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "use": {
+              "type": "object",
+              "description": "代理ユーザ情報",
+              "properties": {
+                "code": { "type": "string", "description": "ユーザコード" },
+                "name": { "type": "string", "description": "氏名" }
+              }
+            },
+            "apply": { "type": "boolean", "description": "代理申請フラグ" },
+            "aprv": { "type": "boolean", "description": "代理承認フラグ" }
+          }
+        }
+      }
+    }
+  }
+}

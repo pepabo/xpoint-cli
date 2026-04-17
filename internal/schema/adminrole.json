@@ -1,0 +1,17 @@
+{
+  "method": "GET",
+  "path": "/api/v1/adminrole",
+  "summary": "ユーザ権限情報取得",
+  "description": "認証ユーザが持つ管理者権限の一覧を取得する。\n",
+  "parameters": [],
+  "response": {
+    "type": "object",
+    "properties": {
+      "role": {
+        "type": "array",
+        "description": "権限情報リスト。一般ユーザの場合は空配列。\n- domain: ドメイン管理権限\n- form: フォーム管理権限\n- user: ユーザ管理権限\n- master: マスタ管理権限\n- query: クエリ管理権限\n- wkfl: ワークフロー管理権限\n",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}

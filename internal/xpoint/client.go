@@ -846,6 +846,62 @@ func (c *Client) GetSelfInfo(ctx context.Context, domainCode string) (*SelfInfo,
 	return &out, nil
 }
 
+type AdminRoleResponse struct {
+	Role []string `json:"role"`
+}
+
+// GetAdminRole calls GET /api/v1/adminrole to fetch the authenticated user's
+// admin role list. Returns an empty list for general users.
+func (c *Client) GetAdminRole(ctx context.Context) (*AdminRoleResponse, error) {
+	var out AdminRoleResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/adminrole", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type ProxyUser struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+type ProxyEntry struct {
+	Use   ProxyUser `json:"use"`
+	Apply bool      `json:"apply"`
+	Aprv  bool      `json:"aprv"`
+}
+
+type ProxyInfoResponse struct {
+	Proxy []ProxyEntry `json:"proxy"`
+}
+
+// GetProxyInfo calls GET /api/v1/proxy to fetch the authenticated user's
+// delegation info.
+func (c *Client) GetProxyInfo(ctx context.Context) (*ProxyInfoResponse, error) {
+	var out ProxyInfoResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/proxy", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type XpointServiceInfo struct {
+	Version      string   `json:"version"`
+	APILevel     int      `json:"api_level"`
+	SingleDomain bool     `json:"single_domain"`
+	Features     []string `json:"features"`
+}
+
+// GetServiceInfo calls GET /x/v1/service to fetch X-point version and feature
+// info. This endpoint does not require authentication.
+func (c *Client) GetServiceInfo(ctx context.Context) (*XpointServiceInfo, error) {
+	var out XpointServiceInfo
+	if err := c.do(ctx, http.MethodGet, "/x/v1/service", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 type QueryForm struct {
 	FID      int    `json:"fid"`
 	FormName string `json:"form_name"`
