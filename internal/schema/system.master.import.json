@@ -1,0 +1,67 @@
+{
+  "method": "PUT",
+  "path": "/api/v1/system/master/{master_code}/data",
+  "summary": "簡易マスタデータインポート",
+  "description": "JSON 形式のマスタデータを簡易マスタにインポートする。\n管理者権限が必要。\n",
+  "parameters": [
+    {
+      "name": "master_code",
+      "in": "path",
+      "required": true,
+      "type": "string",
+      "description": "簡易マスタのマスタコード"
+    }
+  ],
+  "requestBody": {
+    "contentType": "application/json",
+    "type": "object",
+    "properties": {
+      "overwrite": {
+        "type": "boolean",
+        "description": "true: インポートデータで置き換え / false: 追加 (default false)"
+      },
+      "data": {
+        "type": "array",
+        "required": true,
+        "description": "インポートデータ (code/value のオブジェクト配列)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "項目コード"
+            },
+            "value": {
+              "description": "項目値 (文字列または数値)"
+            }
+          }
+        }
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "master": {
+        "type": "object",
+        "description": "マスタ情報"
+      },
+      "all_count": {
+        "type": "integer",
+        "description": "全インポート件数"
+      },
+      "success_count": {
+        "type": "integer",
+        "description": "インポート成功件数"
+      },
+      "error_count": {
+        "type": "integer",
+        "description": "インポート失敗件数"
+      },
+      "result": {
+        "type": "array",
+        "description": "インポート結果情報 (status/data/message)"
+      }
+    }
+  }
+}

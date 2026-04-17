@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -188,6 +189,187 @@ func (c *Client) GetSystemFormDetail(ctx context.Context, formID int) (*FormDeta
 	var out FormDetailResponse
 	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
 		return nil, err
+	}
+	return &out, nil
+}
+
+type Master struct {
+	Type      int    `json:"type"`
+	TypeName  string `json:"type_name"`
+	Name      string `json:"name"`
+	Code      string `json:"code"`
+	TableName string `json:"table_name"`
+	ItemCount int    `json:"item_count"`
+	Remarks   string `json:"remarks"`
+}
+
+type MasterListResponse struct {
+	Master []Master `json:"master"`
+}
+
+// ListMasters calls GET /api/v1/system/master (admin).
+func (c *Client) ListMasters(ctx context.Context) (*MasterListResponse, error) {
+	var out MasterListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/system/master", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type UserMasterField struct {
+	ID         string `json:"id"`
+	Type       string `json:"type"`
+	Length     any    `json:"length"` // varchar -> int, numeric -> "10.2"
+	PrimaryKey bool   `json:"primary_key"`
+	Index      bool   `json:"index"`
+}
+
+type UserMasterInfoResponse struct {
+	TableName string            `json:"table_name"`
+	Fields    []UserMasterField `json:"fields"`
+}
+
+// GetUserMasterInfo calls GET /api/v1/system/master/{master_table_name} (admin)
+// and returns the user-specific master property definition.
+func (c *Client) GetUserMasterInfo(ctx context.Context, tableName string) (*UserMasterInfoResponse, error) {
+	path := fmt.Sprintf("/api/v1/system/master/%s", url.PathEscape(tableName))
+	var out UserMasterInfoResponse
+	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// MasterDataParams holds query parameters for GET /api/v1/system/master/{master_code}/data.
+// MasterType is required (0: simple master, 1: user-specific master).
+// When the path suffix is .csv, the remaining fields (FileName, Delimiter,
+// Title, Fields) apply.
+type MasterDataParams struct {
+	MasterType int    // required (0 or 1)
+	Rows       *int   // default 100, max 1000
+	Offset     *int   // default 0
+	FileName   string // CSV only
+	Delimiter  string // CSV only: "comma" | "tab"
+	Title      *bool  // CSV + user-specific master only
+	Fields     string // CSV + simple master only: comma-separated list
+}
+
+func (p MasterDataParams) query() url.Values {
+	v := url.Values{}
+	v.Set("master_type", strconv.Itoa(p.MasterType))
+	if p.Rows != nil {
+		v.Set("rows", strconv.Itoa(*p.Rows))
+	}
+	if p.Offset != nil {
+		v.Set("offset", strconv.Itoa(*p.Offset))
+	}
+	if p.FileName != "" {
+		v.Set("file_name", p.FileName)
+	}
+	if p.Delimiter != "" {
+		v.Set("delimiter", p.Delimiter)
+	}
+	if p.Title != nil {
+		v.Set("title", strconv.FormatBool(*p.Title))
+	}
+	if p.Fields != "" {
+		v.Set("fields", p.Fields)
+	}
+	return v
+}
+
+// GetMasterData calls GET /api/v1/system/master/{master_code}/data[.json|.csv]
+// and returns the server-provided filename, raw response bytes, and content
+// type. suffix may be "", "json", or "csv" (mapped to .json/.csv).
+func (c *Client) GetMasterData(ctx context.Context, masterCode, suffix string, p MasterDataParams) (string, []byte, string, error) {
+	path := fmt.Sprintf("/api/v1/system/master/%s/data", url.PathEscape(masterCode))
+	accept := "application/json"
+	switch strings.ToLower(suffix) {
+	case "", "json":
+		// default: JSON
+	case "csv":
+		path += ".csv"
+		accept = "text/csv"
+	default:
+		return "", nil, "", fmt.Errorf("unknown master data format %q (must be json or csv)", suffix)
+	}
+	filename, body, ct, err := c.downloadBytesWithContentType(ctx, http.MethodGet, path, p.query(), nil, "", accept)
+	return filename, body, ct, err
+}
+
+type SimpleMasterDataItem struct {
+	Code  string `json:"code"`
+	Value any    `json:"value"`
+}
+
+type ImportSimpleMasterRequest struct {
+	Overwrite *bool                  `json:"overwrite,omitempty"`
+	Data      []SimpleMasterDataItem `json:"data"`
+}
+
+// ImportSimpleMasterData calls PUT /api/v1/system/master/{master_code}/data
+// (admin) to import rows into a simple master. The response shape is
+// documented but complex, so it is returned as raw JSON.
+func (c *Client) ImportSimpleMasterData(ctx context.Context, masterCode string, req ImportSimpleMasterRequest) (json.RawMessage, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+	path := fmt.Sprintf("/api/v1/system/master/%s/data", url.PathEscape(masterCode))
+	var out json.RawMessage
+	if err := c.do(ctx, http.MethodPut, path, nil, body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+type UploadUserMasterResponse struct {
+	Master struct {
+		Type      int    `json:"type"`
+		TypeName  string `json:"type_name"`
+		Name      string `json:"name"`
+		Code      string `json:"code"`
+		TableName string `json:"table_name"`
+	} `json:"master"`
+	MessageType int    `json:"message_type"`
+	Message     string `json:"message"`
+}
+
+// UploadUserMasterCSV calls POST /multiapi/v1/system/master/{master_table_name}/data
+// (admin) to upload a CSV file to a user-specific master's import staging.
+// fileName is the CSV filename, content the raw CSV bytes, overwrite is sent
+// as the overwrite form field when non-nil.
+func (c *Client) UploadUserMasterCSV(ctx context.Context, tableName, fileName string, content []byte, overwrite *bool) (*UploadUserMasterResponse, error) {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+
+	h := textproto.MIMEHeader{}
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename=%q`, fileName))
+	h.Set("Content-Type", "text/csv")
+	fw, err := mw.CreatePart(h)
+	if err != nil {
+		return nil, fmt.Errorf("create file part: %w", err)
+	}
+	if _, err := fw.Write(content); err != nil {
+		return nil, fmt.Errorf("write file content: %w", err)
+	}
+	if overwrite != nil {
+		if err := mw.WriteField("overwrite", strconv.FormatBool(*overwrite)); err != nil {
+			return nil, fmt.Errorf("write overwrite: %w", err)
+		}
+	}
+	if err := mw.Close(); err != nil {
+		return nil, fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	path := fmt.Sprintf("/multiapi/v1/system/master/%s/data", url.PathEscape(tableName))
+	_, body, _, err := c.downloadBytesWithContentType(ctx, http.MethodPost, path, nil, buf.Bytes(), mw.FormDataContentType(), "application/json")
+	if err != nil {
+		return nil, err
+	}
+	var out UploadUserMasterResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &out, nil
 }
@@ -707,6 +889,14 @@ func (c *Client) DownloadPDF(ctx context.Context, docID int) (string, []byte, er
 // the request body; pass "" when body is nil or when Content-Type should
 // be left unset (e.g. multipart where the caller sets the boundary).
 func (c *Client) downloadBytes(ctx context.Context, method, path string, q url.Values, body []byte, contentType, accept string) (string, []byte, error) {
+	filename, respBody, _, err := c.downloadBytesWithContentType(ctx, method, path, q, body, contentType, accept)
+	return filename, respBody, err
+}
+
+// downloadBytesWithContentType is like downloadBytes but also returns the
+// response Content-Type, useful for endpoints that switch format based on
+// URL suffix (e.g. master data JSON/CSV).
+func (c *Client) downloadBytesWithContentType(ctx context.Context, method, path string, q url.Values, body []byte, contentType, accept string) (string, []byte, string, error) {
 	u := c.baseURL + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
@@ -719,7 +909,7 @@ func (c *Client) downloadBytes(ctx context.Context, method, path string, q url.V
 
 	req, err := http.NewRequestWithContext(ctx, method, u, reqBody)
 	if err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	c.auth.apply(req)
 	if accept != "" {
@@ -736,13 +926,13 @@ func (c *Client) downloadBytes(ctx context.Context, method, path string, q url.V
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", nil, fmt.Errorf("request failed: %w", err)
+		return "", nil, "", fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", nil, fmt.Errorf("read response body: %w", err)
+		return "", nil, "", fmt.Errorf("read response body: %w", err)
 	}
 	if debug {
 		fmt.Fprintf(os.Stderr, "[xp] <- %s (%d bytes)\n", resp.Status, len(respBody))
@@ -751,9 +941,9 @@ func (c *Client) downloadBytes(ctx context.Context, method, path string, q url.V
 		}
 	}
 	if resp.StatusCode/100 != 2 {
-		return "", nil, fmt.Errorf("xpoint api error: %s: %s", resp.Status, string(respBody))
+		return "", nil, "", fmt.Errorf("xpoint api error: %s: %s", resp.Status, string(respBody))
 	}
-	return parseContentDispositionFilename(resp.Header.Get("Content-Disposition")), respBody, nil
+	return parseContentDispositionFilename(resp.Header.Get("Content-Disposition")), respBody, resp.Header.Get("Content-Type"), nil
 }
 
 // DocviewParams holds query parameters for GET /api/v1/documents/docview.

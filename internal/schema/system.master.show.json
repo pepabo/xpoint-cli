@@ -1,0 +1,52 @@
+{
+  "method": "GET",
+  "path": "/api/v1/system/master/{master_table_name}",
+  "summary": "ユーザ固有マスタ情報取得",
+  "description": "ユーザ固有マスタプロパティ相当の情報 (フィールド定義) を取得する。\n管理者権限が必要。\n",
+  "parameters": [
+    {
+      "name": "master_table_name",
+      "in": "path",
+      "required": true,
+      "type": "string",
+      "description": "マスタテーブル名"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "table_name": {
+        "type": "string",
+        "description": "マスタテーブル名"
+      },
+      "fields": {
+        "type": "array",
+        "description": "フィールド情報",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "フィールドID"
+            },
+            "type": {
+              "type": "string",
+              "description": "型 (varchar / numeric など)"
+            },
+            "length": {
+              "description": "型に応じた長さ (varchar は integer、numeric は \"10.2\" のような文字列)"
+            },
+            "primary_key": {
+              "type": "boolean",
+              "description": "主キーかどうか"
+            },
+            "index": {
+              "type": "boolean",
+              "description": "インデックスかどうか"
+            }
+          }
+        }
+      }
+    }
+  }
+}

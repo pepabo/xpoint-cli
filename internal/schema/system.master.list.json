@@ -1,0 +1,49 @@
+{
+  "method": "GET",
+  "path": "/api/v1/system/master",
+  "summary": "マスタ一覧取得",
+  "description": "管理者サイトの「マスタ管理」で表示されるマスタ一覧相当のリストを取得する。\n管理者権限が必要。\n",
+  "parameters": [],
+  "response": {
+    "type": "object",
+    "properties": {
+      "master": {
+        "type": "array",
+        "description": "マスタ情報 (存在しない場合は空配列)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "integer",
+              "description": "マスタタイプ (0:簡易マスタ / 1:ユーザ固有マスタ / 2:X-point マスタ / 5:kintone 連携マスタ / 6:書類マスタ)"
+            },
+            "type_name": {
+              "type": "string",
+              "description": "マスタタイプ名称"
+            },
+            "name": {
+              "type": "string",
+              "description": "マスタ名称"
+            },
+            "code": {
+              "type": "string",
+              "description": "マスタコード (簡易/kintone/書類マスタのみ返される)"
+            },
+            "table_name": {
+              "type": "string",
+              "description": "マスタテーブル名 (ユーザ固有マスタで返される)"
+            },
+            "item_count": {
+              "type": "integer",
+              "description": "データ件数"
+            },
+            "remarks": {
+              "type": "string",
+              "description": "備考"
+            }
+          }
+        }
+      }
+    }
+  }
+}

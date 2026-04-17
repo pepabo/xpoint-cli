@@ -38,6 +38,11 @@ func TestAliases_Sorted(t *testing.T) {
 		"query.list",
 		"system.form.list",
 		"system.form.show",
+		"system.master.data",
+		"system.master.import",
+		"system.master.list",
+		"system.master.show",
+		"system.master.upload",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("aliases = %v", got)
