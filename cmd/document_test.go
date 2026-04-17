@@ -8,6 +8,50 @@ import (
 	"testing"
 )
 
+func TestResolveDownloadPath_DefaultUsesServerName(t *testing.T) {
+	got := resolveDownloadPath("", "経費.pdf", 42)
+	if got != "経費.pdf" {
+		t.Errorf("got = %q, want 経費.pdf", got)
+	}
+}
+
+func TestResolveDownloadPath_DefaultFallbackWhenEmpty(t *testing.T) {
+	got := resolveDownloadPath("", "", 42)
+	if got != "42.pdf" {
+		t.Errorf("got = %q, want 42.pdf", got)
+	}
+}
+
+func TestResolveDownloadPath_StripsPathTraversal(t *testing.T) {
+	got := resolveDownloadPath("", "../../etc/passwd", 99)
+	if got != "passwd" {
+		t.Errorf("got = %q, want passwd", got)
+	}
+}
+
+func TestResolveDownloadPath_ExplicitFile(t *testing.T) {
+	got := resolveDownloadPath("out.pdf", "server.pdf", 1)
+	if got != "out.pdf" {
+		t.Errorf("got = %q, want out.pdf", got)
+	}
+}
+
+func TestResolveDownloadPath_DirectorySuffix(t *testing.T) {
+	got := resolveDownloadPath("sub/", "doc.pdf", 1)
+	if got != filepath.Join("sub", "doc.pdf") {
+		t.Errorf("got = %q", got)
+	}
+}
+
+func TestResolveDownloadPath_ExistingDirectory(t *testing.T) {
+	dir := t.TempDir()
+	got := resolveDownloadPath(dir, "server.pdf", 1)
+	want := filepath.Join(dir, "server.pdf")
+	if got != want {
+		t.Errorf("got = %q, want %q", got, want)
+	}
+}
+
 func TestLoadSearchBody_Empty(t *testing.T) {
 	b, err := loadSearchBody("")
 	if err != nil {

@@ -356,6 +356,83 @@ func TestDocumentURL(t *testing.T) {
 	}
 }
 
+func TestDownloadPDF(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/api/v1/documents/42/pdf" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Disposition", `attachment; filename="fallback.pdf"; filename*=UTF-8''%E7%B5%8C%E8%B2%BB.pdf`)
+		_, _ = w.Write([]byte("%PDF-1.4 body"))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	name, data, err := c.DownloadPDF(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("DownloadPDF: %v", err)
+	}
+	if name != "経費.pdf" {
+		t.Errorf("filename = %q, want 経費.pdf", name)
+	}
+	if !strings.HasPrefix(string(data), "%PDF-1.4") {
+		t.Errorf("data = %q", string(data))
+	}
+}
+
+func TestDownloadPDF_PlainFilename(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Disposition", `attachment; filename="report.pdf"`)
+		_, _ = w.Write([]byte("pdf"))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	name, _, err := c.DownloadPDF(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("DownloadPDF: %v", err)
+	}
+	if name != "report.pdf" {
+		t.Errorf("filename = %q", name)
+	}
+}
+
+func TestDownloadPDF_NoContentDisposition(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("pdf"))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	name, data, err := c.DownloadPDF(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("DownloadPDF: %v", err)
+	}
+	if name != "" {
+		t.Errorf("filename = %q, want empty", name)
+	}
+	if string(data) != "pdf" {
+		t.Errorf("data = %q", string(data))
+	}
+}
+
+func TestDownloadPDF_ErrorResponse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"forbidden"}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	_, _, err := c.DownloadPDF(context.Background(), 1)
+	if err == nil || !strings.Contains(err.Error(), "403") || !strings.Contains(err.Error(), "forbidden") {
+		t.Errorf("err = %v", err)
+	}
+}
+
 func TestNewClient_BaseURL(t *testing.T) {
 	c := NewClient("acme", Auth{AccessToken: "t"})
 	if !strings.HasPrefix(c.baseURL, "https://acme.atledcloud.jp/xpoint") {

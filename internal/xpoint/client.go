@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -352,6 +353,62 @@ func (c *Client) DeleteDocument(ctx context.Context, docID int) (*DeleteDocument
 		return nil, err
 	}
 	return &out, nil
+}
+
+// DownloadPDF calls GET /api/v1/documents/{docid}/pdf and returns the PDF
+// bytes and the server-provided filename (parsed from Content-Disposition,
+// which may use RFC 5987 encoding). The filename is empty when the server
+// does not provide one.
+func (c *Client) DownloadPDF(ctx context.Context, docID int) (string, []byte, error) {
+	path := fmt.Sprintf("/api/v1/documents/%d/pdf", docID)
+	u := c.baseURL + path
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return "", nil, err
+	}
+	c.auth.apply(req)
+	req.Header.Set("Accept", "application/pdf")
+
+	debug := os.Getenv("XP_DEBUG") != ""
+	if debug {
+		fmt.Fprintf(os.Stderr, "[xp] %s %s\n", req.Method, u)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", nil, fmt.Errorf("read response body: %w", err)
+	}
+	if debug {
+		fmt.Fprintf(os.Stderr, "[xp] <- %s (%d bytes)\n", resp.Status, len(body))
+		if resp.StatusCode/100 != 2 {
+			fmt.Fprintf(os.Stderr, "[xp]    %s\n", string(body))
+		}
+	}
+	if resp.StatusCode/100 != 2 {
+		return "", nil, fmt.Errorf("xpoint api error: %s: %s", resp.Status, string(body))
+	}
+	return parseContentDispositionFilename(resp.Header.Get("Content-Disposition")), body, nil
+}
+
+// parseContentDispositionFilename extracts a filename from a Content-Disposition
+// header value, preferring the RFC 5987 filename* form when present.
+func parseContentDispositionFilename(cd string) string {
+	if cd == "" {
+		return ""
+	}
+	if _, params, err := mime.ParseMediaType(cd); err == nil {
+		if name := params["filename"]; name != "" {
+			return name
+		}
+	}
+	return ""
 }
 
 // do executes an HTTP request and decodes a JSON response into out.

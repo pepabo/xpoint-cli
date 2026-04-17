@@ -97,6 +97,15 @@ cat search.json | xp document search --body -
 xp document search --size 100 --page 2
 ```
 
+### ドキュメントのPDFダウンロード
+
+```sh
+xp document download 266248                # カレントディレクトリにサーバ提供ファイル名で保存
+xp document download 266248 -o out.pdf     # 指定パスに保存
+xp document download 266248 -o pdfs/       # 指定ディレクトリにサーバ提供ファイル名で保存
+xp document download 266248 -o - > out.pdf # 標準出力に書き出し
+```
+
 ### レスポンススキーマの確認
 
 ```sh
