@@ -10,8 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var schemaJQ string
-
 var schemaCmd = &cobra.Command{
 	Use:   "schema [service.resource.method]",
 	Short: "Show the schema for an X-point operation",
@@ -29,7 +27,6 @@ Run without arguments to list supported aliases.`,
 
 func init() {
 	rootCmd.AddCommand(schemaCmd)
-	schemaCmd.Flags().StringVar(&schemaJQ, "jq", "", "apply a gojq filter to the schema")
 }
 
 func runSchema(_ *cobra.Command, args []string) error {
@@ -44,9 +41,6 @@ func runSchema(_ *cobra.Command, args []string) error {
 	op, err := xpoint.LookupOperation(alias)
 	if err != nil {
 		return err
-	}
-	if schemaJQ != "" {
-		return runJQ(op, schemaJQ)
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")

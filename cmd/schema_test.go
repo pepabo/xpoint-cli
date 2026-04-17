@@ -21,9 +21,6 @@ func TestSchemaCmd_ListsAliases(t *testing.T) {
 }
 
 func TestSchemaCmd_EmitsJSON(t *testing.T) {
-	schemaJQ = ""
-	t.Cleanup(func() { schemaJQ = "" })
-
 	out, err := captureStdout(t, func() error {
 		return runSchema(schemaCmd, []string{"form.list"})
 	})
@@ -40,24 +37,8 @@ func TestSchemaCmd_EmitsJSON(t *testing.T) {
 }
 
 func TestSchemaCmd_UnknownAlias(t *testing.T) {
-	schemaJQ = ""
 	err := runSchema(schemaCmd, []string{"nope"})
 	if err == nil || !strings.Contains(err.Error(), "unknown schema alias") {
 		t.Errorf("err = %v", err)
-	}
-}
-
-func TestSchemaCmd_JQFilter(t *testing.T) {
-	schemaJQ = ".summary"
-	t.Cleanup(func() { schemaJQ = "" })
-
-	out, err := captureStdout(t, func() error {
-		return runSchema(schemaCmd, []string{"form.list"})
-	})
-	if err != nil {
-		t.Fatalf("runSchema: %v", err)
-	}
-	if strings.TrimSpace(out) != `"利用可能フォーム一覧取得"` {
-		t.Errorf("output = %q", out)
 	}
 }
