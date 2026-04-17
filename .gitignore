@@ -38,5 +38,5 @@ go.work.sum
 # .vscode/
 
 # Claude Code
-/.claude/workspace
+/.claude/worktrees
 /tmp
