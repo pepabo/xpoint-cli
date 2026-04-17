@@ -17,21 +17,21 @@ import (
 )
 
 var (
-	docSearchBody    string
-	docSearchSize    int
-	docSearchOffset  int
-	docSearchPage    int
-	docSearchOutput  string
-	docSearchJQ      string
-	docSearchTitle   string
+	docSearchBody     string
+	docSearchSize     int
+	docSearchOffset   int
+	docSearchPage     int
+	docSearchOutput   string
+	docSearchJQ       string
+	docSearchTitle    string
 	docSearchFormName string
-	docSearchFormID  int
-	docSearchFGID    int
-	docSearchWriters []string
-	docSearchGroups  []string
-	docSearchMe      bool
-	docSearchSince   string
-	docSearchUntil   string
+	docSearchFormID   int
+	docSearchFGID     int
+	docSearchWriters  []string
+	docSearchGroups   []string
+	docSearchMe       bool
+	docSearchSince    string
+	docSearchUntil    string
 
 	docCreateBody   string
 	docCreateOutput string

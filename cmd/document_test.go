@@ -168,7 +168,6 @@ func TestResolveCurrentUserCode_UsesEnvUser(t *testing.T) {
 	}
 }
 
-
 func TestRunDocumentSearch_BodyAndFilterConflict(t *testing.T) {
 	resetSearchFlags(t)
 	t.Setenv("XPOINT_SUBDOMAIN", "acme")
