@@ -15,6 +15,7 @@ func TestAliases_Sorted(t *testing.T) {
 		"document.search",
 		"document.update",
 		"form.list",
+		"form.show",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("aliases = %v", got)
@@ -135,6 +136,27 @@ func TestLookup_DocumentDelete(t *testing.T) {
 	}
 	if op["path"] != "/api/v1/documents/{docid}" {
 		t.Errorf("path = %v", op["path"])
+	}
+}
+
+func TestLookup_FormShow(t *testing.T) {
+	op, err := Lookup("form.show")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "GET" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/forms/{fid}" {
+		t.Errorf("path = %v", op["path"])
+	}
+	params, _ := op["parameters"].([]any)
+	if len(params) != 1 {
+		t.Fatalf("parameters = %v", params)
+	}
+	first, _ := params[0].(map[string]any)
+	if first["name"] != "fid" || first["required"] != true || first["type"] != "integer" {
+		t.Errorf("fid param = %v", first)
 	}
 }
 
