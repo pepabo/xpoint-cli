@@ -17,8 +17,6 @@ builds:
     ldflags:
       - -s -w
       - -X github.com/pepabo/xpoint-cli/cmd.version={{.Version}}
-      - -X github.com/pepabo/xpoint-cli/cmd.commit={{.Commit}}
-      - -X github.com/pepabo/xpoint-cli/cmd.date={{.Date}}
     goos:
       - linux
       - darwin
