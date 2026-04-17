@@ -344,6 +344,18 @@ func TestDo_AppliesAuthHeader(t *testing.T) {
 	}
 }
 
+func TestDocumentURL(t *testing.T) {
+	c := NewClient("acme", Auth{AccessToken: "t"})
+	got := c.DocumentURL(266248)
+	want := "https://acme.atledcloud.jp/xpoint/form.do?act=view&docid=266248"
+	if got != want {
+		t.Errorf("DocumentURL = %q, want %q", got, want)
+	}
+	if c.DocumentURL(0) != "" {
+		t.Errorf("DocumentURL(0) should be empty")
+	}
+}
+
 func TestNewClient_BaseURL(t *testing.T) {
 	c := NewClient("acme", Auth{AccessToken: "t"})
 	if !strings.HasPrefix(c.baseURL, "https://acme.atledcloud.jp/xpoint") {
