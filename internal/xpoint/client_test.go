@@ -393,6 +393,129 @@ func TestGetSelfInfo_RequiresDomainCode(t *testing.T) {
 	}
 }
 
+func TestListAvailableQueries(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/api/v1/query/" {
+			t.Errorf("path = %s, want /api/v1/query/", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"query_groups":[{"query_group_id":1,"query_group_name":"g1","queries":[{"query_id":100,"query_code":"q01","query_name":"n1","query_type":"list","query_type_name":"一覧","remarks":"","form_count":1,"fid":200,"form_name":"f1"}]}]}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	got, err := c.ListAvailableQueries(context.Background())
+	if err != nil {
+		t.Fatalf("ListAvailableQueries: %v", err)
+	}
+	if len(got.QueryGroups) != 1 || got.QueryGroups[0].QueryGroupID != 1 {
+		t.Fatalf("unexpected query_groups: %+v", got.QueryGroups)
+	}
+	q := got.QueryGroups[0].Queries[0]
+	if q.QueryCode != "q01" || q.QueryType != "list" || q.FID != 200 {
+		t.Errorf("unexpected query: %+v", q)
+	}
+}
+
+func TestGetQueryParams_Query(t *testing.T) {
+	rows, offset := 100, 50
+	p := GetQueryParams{ExecFlag: true, Rows: &rows, Offset: &offset}
+	q := p.query()
+	if got := q.Get("exec_flg"); got != "true" {
+		t.Errorf("exec_flg = %q", got)
+	}
+	if got := q.Get("rows"); got != "100" {
+		t.Errorf("rows = %q", got)
+	}
+	if got := q.Get("offset"); got != "50" {
+		t.Errorf("offset = %q", got)
+	}
+}
+
+func TestGetQueryParams_Query_OmitsZeroAndFalse(t *testing.T) {
+	q := GetQueryParams{}.query()
+	for _, k := range []string{"exec_flg", "rows", "offset"} {
+		if q.Has(k) {
+			t.Errorf("query should not contain %q, got %q", k, q.Get(k))
+		}
+	}
+}
+
+func TestGetQuery_EscapesCodeAndDecodes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.EscapedPath() != "/api/v1/query/q%20%2F01" {
+			t.Errorf("path = %s", r.URL.EscapedPath())
+		}
+		if got := r.URL.Query().Get("exec_flg"); got != "true" {
+			t.Errorf("exec_flg = %q", got)
+		}
+		_, _ = w.Write([]byte(`{"query":{"query_code":"q /01"},"exec_result":{"data":[]}}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	raw, err := c.GetQuery(context.Background(), "q /01", GetQueryParams{ExecFlag: true})
+	if err != nil {
+		t.Fatalf("GetQuery: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("raw not JSON: %v", err)
+	}
+	if _, ok := decoded["exec_result"]; !ok {
+		t.Errorf("exec_result missing: %s", string(raw))
+	}
+}
+
+func TestGetDocumentStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/api/v1/documents/999/status" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if r.URL.Query().Has("history") {
+			t.Errorf("history query should be omitted, got %q", r.URL.Query().Get("history"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"document":{"docid":999,"status":{"code":1,"name":"承認中"}}}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	raw, err := c.GetDocumentStatus(context.Background(), 999, false)
+	if err != nil {
+		t.Fatalf("GetDocumentStatus: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("raw not JSON: %v (%s)", err, string(raw))
+	}
+	doc, _ := decoded["document"].(map[string]any)
+	if doc["docid"].(float64) != 999 {
+		t.Errorf("docid = %v", doc["docid"])
+	}
+}
+
+func TestGetDocumentStatus_WithHistory(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("history"); got != "true" {
+			t.Errorf("history = %q, want true", got)
+		}
+		_, _ = w.Write([]byte(`{"document":{"docid":1}}`))
+	}))
+	defer srv.Close()
+
+	c := clientForServer(srv)
+	if _, err := c.GetDocumentStatus(context.Background(), 1, true); err != nil {
+		t.Fatalf("GetDocumentStatus: %v", err)
+	}
+}
+
 func TestDownloadPDF(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

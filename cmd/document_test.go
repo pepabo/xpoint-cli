@@ -343,6 +343,43 @@ func TestRunDocumentEdit_RequiresBody(t *testing.T) {
 	}
 }
 
+func TestRunDocumentOpen_InvalidDocID(t *testing.T) {
+	err := runDocumentOpen(documentOpenCmd, []string{"0"})
+	if err == nil || !strings.Contains(err.Error(), "invalid docid") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestRunDocumentOpen_NoBrowserPrintsURL(t *testing.T) {
+	docOpenNoBrowser = true
+	t.Cleanup(func() { docOpenNoBrowser = false })
+	t.Setenv("XPOINT_SUBDOMAIN", "acme")
+
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	done := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- string(b)
+	}()
+
+	if err := runDocumentOpen(documentOpenCmd, []string{"266248"}); err != nil {
+		t.Fatalf("runDocumentOpen: %v", err)
+	}
+	_ = w.Close()
+	got := strings.TrimSpace(<-done)
+	want := "https://acme.atledcloud.jp/xpoint/form.do?act=view&docid=266248"
+	if got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+}
+
 func TestRunDocumentEdit_InvalidDocID(t *testing.T) {
 	err := runDocumentEdit(documentEditCmd, []string{"not-a-number"})
 	if err == nil || !strings.Contains(err.Error(), "invalid docid") {

@@ -1,0 +1,85 @@
+{
+  "method": "GET",
+  "path": "/api/v1/documents/{docid}/status",
+  "summary": "書類承認状況取得",
+  "description": "指定された書類 ID の最新版の承認状況を取得する。閲覧権限が必要。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    },
+    {
+      "name": "history",
+      "in": "query",
+      "type": "boolean",
+      "required": false,
+      "description": "true の場合、全バージョンの承認履歴情報を含めて返す。既定は false。"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "document": {
+        "type": "object",
+        "description": "書類情報",
+        "properties": {
+          "docid": {
+            "type": "integer",
+            "description": "書類ID"
+          },
+          "title1": {
+            "type": "string",
+            "description": "件名1"
+          },
+          "title2": {
+            "type": "string",
+            "description": "件名2"
+          },
+          "form": {
+            "type": "object",
+            "description": "フォーム情報 (id, code, name)"
+          },
+          "route": {
+            "type": "object",
+            "description": "承認ルート情報 (code, name)"
+          },
+          "type": {
+            "type": "string",
+            "description": "フォーム種別 (standard: 通常フォーム / workflow: ワークフローフォーム)"
+          },
+          "status": {
+            "type": "object",
+            "description": "書類状態 (code: 0=下書き, 1=承認中, 2=保留中, 3=却下, 4=差し戻され, 5=差し戻し, 6=承認完了)"
+          },
+          "step": {
+            "type": "object",
+            "description": "ステップ情報 (max, current)"
+          },
+          "current_version": {
+            "type": "integer",
+            "description": "現在バージョン番号"
+          },
+          "writer": {
+            "type": "object",
+            "description": "申請者情報 (usercode, username, stampname, datetime)"
+          },
+          "lastaprv": {
+            "type": "object",
+            "description": "最終承認者情報 (usercode, username, stampname, datetime)"
+          },
+          "flow_versions": {
+            "type": "array",
+            "description": "最新バージョンの承認フロー結果。通常フォームの場合は空配列。"
+          },
+          "histories": {
+            "type": "array",
+            "description": "承認履歴情報 (version ごと)。クエリパラメータ history が true の場合に返る。通常フォームの場合は空配列。"
+          }
+        }
+      }
+    }
+  }
+}

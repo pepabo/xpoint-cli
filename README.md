@@ -88,6 +88,18 @@ xp approval list --filter 'cr_dt between "2023-01-01" and "2023-12-31"'
 
 `--stat` の値は X-point のマニュアル参照（10=承認待ち、20=通知、30=下書き等、40=状況確認、50=承認完了）。
 
+### クエリ一覧 / 実行
+
+```sh
+xp query list                           # 利用可能なクエリを一覧表示
+xp query list --jq '.query_groups[].queries[].query_code'
+
+xp query exec query01                   # クエリを実行して定義と結果を取得
+xp query exec query01 --no-run          # 定義のみ取得（実行しない）
+xp query exec query01 --rows 100 --offset 0
+xp query exec query01 --jq '.exec_result.data'
+```
+
 ### ドキュメント検索
 
 ```sh
@@ -106,6 +118,21 @@ xp document search --writer alice --writer bob        # 申請者指定（複数
 xp document search --writer-group grp1                # 申請者グループ指定
 xp document search --me                               # 自分が申請者の書類（XPOINT_USER、未設定なら /scim/v2/{domain_code}/Me の atled 拡張 userCode を利用。domain_code は保存済み OAuth トークンの値も利用）
 xp document search --since 2024-01-01 --until 2024-12-31
+```
+
+### ドキュメントの承認状況取得
+
+```sh
+xp document status 266248                   # 最新版の承認状況（JSON）
+xp document status 266248 --history         # 全バージョンの承認履歴も含める
+xp document status 266248 --jq '.document.status.name'
+```
+
+### ドキュメントをブラウザで開く
+
+```sh
+xp document open 266248              # 既定のブラウザで書類を開く
+xp document open 266248 --no-browser # URLだけ出力（ブラウザは起動しない）
 ```
 
 ### ドキュメントのPDFダウンロード

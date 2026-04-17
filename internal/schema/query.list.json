@@ -1,0 +1,88 @@
+{
+  "method": "GET",
+  "path": "/api/v1/query/",
+  "summary": "利用可能クエリ一覧取得",
+  "description": "認証ユーザーが利用できるクエリ情報の一覧を取得する。\n",
+  "response": {
+    "type": "object",
+    "properties": {
+      "query_groups": {
+        "type": "array",
+        "description": "クエリグループ情報。取得結果が 1 件も無い場合は空配列。",
+        "items": {
+          "type": "object",
+          "properties": {
+            "query_group_id": {
+              "type": "integer",
+              "description": "クエリグループID。マイクエリの場合は 0 固定"
+            },
+            "query_group_name": {
+              "type": "string",
+              "description": "クエリグループ名称"
+            },
+            "queries": {
+              "type": "array",
+              "description": "クエリグループに属するクエリの一覧",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "query_id": {
+                    "type": "integer",
+                    "description": "クエリID"
+                  },
+                  "query_code": {
+                    "type": "string",
+                    "description": "クエリコード"
+                  },
+                  "query_name": {
+                    "type": "string",
+                    "description": "クエリ名"
+                  },
+                  "query_type": {
+                    "type": "string",
+                    "description": "クエリ種別 (list: 一覧 / summary: サマリ / cross: クロス集計)"
+                  },
+                  "query_type_name": {
+                    "type": "string",
+                    "description": "クエリ種別名称"
+                  },
+                  "remarks": {
+                    "type": "string",
+                    "description": "備考"
+                  },
+                  "form_count": {
+                    "type": "integer",
+                    "description": "参照するフォームの件数"
+                  },
+                  "fid": {
+                    "type": "integer",
+                    "description": "フォームID (form_count が 1 の場合)"
+                  },
+                  "form_name": {
+                    "type": "string",
+                    "description": "フォーム名 (form_count が 1 の場合)"
+                  },
+                  "forms": {
+                    "type": "array",
+                    "description": "フォーム情報 (form_count が 2 以上の場合)",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "fid": {
+                          "type": "integer"
+                        },
+                        "form_name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

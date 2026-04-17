@@ -382,6 +382,95 @@ func (c *Client) GetSelfInfo(ctx context.Context, domainCode string) (*SelfInfo,
 	return &out, nil
 }
 
+type QueryForm struct {
+	FID      int    `json:"fid"`
+	FormName string `json:"form_name"`
+}
+
+type Query struct {
+	QueryID       int         `json:"query_id"`
+	QueryCode     string      `json:"query_code"`
+	QueryName     string      `json:"query_name"`
+	QueryType     string      `json:"query_type"`
+	QueryTypeName string      `json:"query_type_name,omitempty"`
+	Remarks       string      `json:"remarks"`
+	FormCount     int         `json:"form_count"`
+	FID           int         `json:"fid,omitempty"`
+	FormName      string      `json:"form_name,omitempty"`
+	Forms         []QueryForm `json:"forms,omitempty"`
+}
+
+type QueryGroup struct {
+	QueryGroupID   int     `json:"query_group_id"`
+	QueryGroupName string  `json:"query_group_name"`
+	Queries        []Query `json:"queries"`
+}
+
+type QueryListResponse struct {
+	QueryGroups []QueryGroup `json:"query_groups"`
+}
+
+// ListAvailableQueries calls GET /api/v1/query/ (ユーザー別API: 利用可能クエリ一覧取得).
+func (c *Client) ListAvailableQueries(ctx context.Context) (*QueryListResponse, error) {
+	var out QueryListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/query/", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetQueryParams holds query parameters for GET /api/v1/query/{query_code}.
+// A nil Rows or Offset means "omit and let the server use its default".
+type GetQueryParams struct {
+	ExecFlag bool // true -> exec_flg=true (executes the query)
+	Rows     *int // rows (server default 500, range 1-10000)
+	Offset   *int // offset (server default 0)
+}
+
+func (p GetQueryParams) query() url.Values {
+	v := url.Values{}
+	if p.ExecFlag {
+		v.Set("exec_flg", "true")
+	}
+	if p.Rows != nil {
+		v.Set("rows", strconv.Itoa(*p.Rows))
+	}
+	if p.Offset != nil {
+		v.Set("offset", strconv.Itoa(*p.Offset))
+	}
+	return v
+}
+
+// GetQuery calls GET /api/v1/query/{query_code}. When ExecFlag is true the
+// response includes exec_result. The response shape varies by query_type
+// (list/summary/cross), so it is returned as raw JSON.
+func (c *Client) GetQuery(ctx context.Context, queryCode string, p GetQueryParams) (json.RawMessage, error) {
+	path := fmt.Sprintf("/api/v1/query/%s", url.PathEscape(queryCode))
+	var out json.RawMessage
+	if err := c.do(ctx, http.MethodGet, path, p.query(), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetDocumentStatus calls GET /api/v1/documents/{docid}/status.
+// When history is true, approval histories for every version are included.
+// The response shape is complex (form, status, step, flow_results, etc.),
+// so it is returned as raw JSON for the caller to interpret.
+func (c *Client) GetDocumentStatus(ctx context.Context, docID int, history bool) (json.RawMessage, error) {
+	path := fmt.Sprintf("/api/v1/documents/%d/status", docID)
+	var q url.Values
+	if history {
+		q = url.Values{}
+		q.Set("history", "true")
+	}
+	var out json.RawMessage
+	if err := c.do(ctx, http.MethodGet, path, q, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DownloadPDF calls GET /api/v1/documents/{docid}/pdf and returns the PDF
 // bytes and the server-provided filename (parsed from Content-Disposition,
 // which may use RFC 5987 encoding). The filename is empty when the server

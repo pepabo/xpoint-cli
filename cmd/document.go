@@ -49,6 +49,11 @@ var (
 	docDeleteJQ     string
 
 	docDownloadOutput string
+
+	docStatusHistory bool
+	docStatusJQ      string
+
+	docOpenNoBrowser bool
 )
 
 var documentCmd = &cobra.Command{
@@ -139,6 +144,29 @@ By default the command prompts for confirmation. Pass --yes to skip it.`,
 	RunE: runDocumentDelete,
 }
 
+var documentStatusCmd = &cobra.Command{
+	Use:   "status <docid>",
+	Short: "Get document approval status",
+	Long: `Retrieve the approval status of a document via GET /api/v1/documents/{docid}/status.
+
+The response is returned as JSON and contains the current status, step,
+writer, last approver, and the approval flow. Pass --history to include
+approval histories for all past versions.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentStatus,
+}
+
+var documentOpenCmd = &cobra.Command{
+	Use:   "open <docid>",
+	Short: "Open a document in the default web browser",
+	Long: `Open the document view page in the default web browser.
+
+The URL is built from the configured subdomain (no API request is made).
+Pass --no-browser (or -n) to print the URL without launching the browser.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentOpen,
+}
+
 var documentDownloadCmd = &cobra.Command{
 	Use:   "download <docid>",
 	Short: "Download a document as PDF",
@@ -160,7 +188,9 @@ func init() {
 	documentCmd.AddCommand(documentGetCmd)
 	documentCmd.AddCommand(documentEditCmd)
 	documentCmd.AddCommand(documentDeleteCmd)
+	documentCmd.AddCommand(documentStatusCmd)
 	documentCmd.AddCommand(documentDownloadCmd)
+	documentCmd.AddCommand(documentOpenCmd)
 
 	f := documentSearchCmd.Flags()
 	f.StringVar(&docSearchBody, "body", "", "search condition JSON: inline, file path, or - for stdin (cannot be combined with filter flags)")
@@ -198,8 +228,15 @@ func init() {
 	df.StringVarP(&docDeleteOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
 	df.StringVar(&docDeleteJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
 
+	sf := documentStatusCmd.Flags()
+	sf.BoolVar(&docStatusHistory, "history", false, "include approval histories for all versions")
+	sf.StringVar(&docStatusJQ, "jq", "", "apply a gojq filter to the JSON response")
+
 	dlf := documentDownloadCmd.Flags()
 	dlf.StringVarP(&docDownloadOutput, "output", "o", "", "output path: FILE, DIR/, or - for stdout (default: server-provided filename in current directory)")
+
+	of := documentOpenCmd.Flags()
+	of.BoolVarP(&docOpenNoBrowser, "no-browser", "n", false, "print the URL without launching the browser")
 }
 
 func runDocumentSearch(cmd *cobra.Command, args []string) error {
@@ -390,6 +427,25 @@ func runDocumentDelete(cmd *cobra.Command, args []string) error {
 	})
 }
 
+func runDocumentStatus(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	raw, err := client.GetDocumentStatus(cmd.Context(), docID, docStatusHistory)
+	if err != nil {
+		return err
+	}
+	if docStatusJQ != "" {
+		return runJQ(raw, docStatusJQ)
+	}
+	return writeJSON(os.Stdout, raw)
+}
+
 func runDocumentDownload(cmd *cobra.Command, args []string) error {
 	docID, err := parseDocID(args[0])
 	if err != nil {
@@ -416,6 +472,28 @@ func runDocumentDownload(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("write pdf: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "saved: %s (%d bytes)\n", dst, len(data))
+	return nil
+}
+
+func runDocumentOpen(_ *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	sub, err := resolveSubdomain()
+	if err != nil {
+		return err
+	}
+	url := xpoint.NewClient(sub, xpoint.Auth{}).DocumentURL(docID)
+
+	if docOpenNoBrowser {
+		fmt.Fprintln(os.Stdout, url)
+		return nil
+	}
+	fmt.Fprintf(os.Stdout, "Opening %s\n", url)
+	if err := openBrowser(url); err != nil {
+		return fmt.Errorf("open browser: %w (run with --no-browser to print the URL)", err)
+	}
 	return nil
 }
 
