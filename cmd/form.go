@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -34,7 +36,7 @@ func init() {
 }
 
 func runFormList(cmd *cobra.Command, args []string) error {
-	client, err := newClientFromFlags()
+	client, err := newClientFromFlags(cmd.Context())
 	if err != nil {
 		return err
 	}
@@ -60,14 +62,68 @@ func runFormList(cmd *cobra.Command, args []string) error {
 	})
 }
 
-func newClientFromFlags() (*xpoint.Client, error) {
+// newClientFromFlags resolves the credentials in priority order:
+//  1. explicit --xpoint-* flags
+//  2. XPOINT_* environment variables
+//  3. OAuth token saved in the system keyring by `xp auth login`
+//
+// The keyring fallback automatically refreshes the access token when it has
+// expired and writes the new token back, so callers do not need to think
+// about expiry.
+func newClientFromFlags(ctx context.Context) (*xpoint.Client, error) {
 	sub, err := resolveSubdomain()
 	if err != nil {
 		return nil, err
 	}
-	auth, err := resolveAuth()
+
+	if auth, ok, err := authFromFlags(); err != nil {
+		return nil, err
+	} else if ok {
+		return xpoint.NewClient(sub, auth), nil
+	}
+
+	if auth, ok, err := authFromEnv(); err != nil {
+		return nil, err
+	} else if ok {
+		return xpoint.NewClient(sub, auth), nil
+	}
+
+	auth, err := loadStoredTokenAuth(ctx, sub)
 	if err != nil {
 		return nil, err
 	}
 	return xpoint.NewClient(sub, auth), nil
+}
+
+// loadStoredTokenAuth reads the token saved by `xp auth login` for subdomain,
+// refreshing it via the X-point token endpoint when expired. The refreshed
+// token is written back to the keyring so the next call has an up-to-date
+// refresh token (the X-point server invalidates the old refresh token once a
+// refresh succeeds).
+func loadStoredTokenAuth(ctx context.Context, subdomain string) (xpoint.Auth, error) {
+	stored, err := xpoint.LoadToken(subdomain)
+	if err != nil {
+		if errors.Is(err, xpoint.ErrTokenNotFound) {
+			return xpoint.Auth{}, errors.New("authentication is required: set XPOINT_GENERIC_API_TOKEN (with XPOINT_DOMAIN_CODE and XPOINT_USER) or XPOINT_API_ACCESS_TOKEN, or run 'xp auth login'")
+		}
+		return xpoint.Auth{}, err
+	}
+
+	if stored.Expired() && stored.RefreshToken != "" && stored.ClientID != "" {
+		cfg := &xpoint.OAuthConfig{
+			Subdomain:  subdomain,
+			DomainCode: stored.DomainCode,
+			ClientID:   stored.ClientID,
+		}
+		fresh, err := cfg.RefreshToken(ctx, stored.RefreshToken)
+		if err != nil {
+			return xpoint.Auth{}, fmt.Errorf("refresh stored token: %w", err)
+		}
+		stored.Token = *fresh
+		if err := xpoint.SaveToken(stored); err != nil {
+			return xpoint.Auth{}, fmt.Errorf("save refreshed token: %w", err)
+		}
+	}
+
+	return xpoint.Auth{AccessToken: stored.AccessToken}, nil
 }
