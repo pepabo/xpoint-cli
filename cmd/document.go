@@ -123,7 +123,7 @@ func runDocumentSearch(cmd *cobra.Command, args []string) error {
 }
 
 func runDocumentCreate(cmd *cobra.Command, args []string) error {
-	client, err := newClientFromFlags()
+	client, err := newClientFromFlags(cmd.Context())
 	if err != nil {
 		return err
 	}
