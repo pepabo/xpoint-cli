@@ -913,11 +913,12 @@ func printFlowResultsTable(out io.Writer, steps []documentStatusFlowStep, curren
 			completionStepNo = int(steps[len(steps)-1].StepNo) + 1
 		}
 		var stepStr string
-		if completionStepNo == 0 {
+		switch {
+		case completionStepNo == 0:
 			stepStr = ""
-		} else if completion.current {
+		case completion.current:
 			stepStr = "*" + strconv.Itoa(completionStepNo)
-		} else {
+		default:
 			stepStr = " " + strconv.Itoa(completionStepNo)
 		}
 		emit(stepStr, "承認完了", completion.user, completion.status, completion.datetime)
