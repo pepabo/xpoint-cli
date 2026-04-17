@@ -19,6 +19,7 @@ Supported aliases map to the CLI's commands:
   form.list         GET  /api/v1/forms
   approval.list     GET  /api/v1/approvals
   document.search   POST /api/v1/search/documents
+  document.create   POST /api/v1/documents
 
 Run without arguments to list supported aliases.`,
 	Args: cobra.MaximumNArgs(1),

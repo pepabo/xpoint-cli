@@ -7,7 +7,7 @@ import (
 
 func TestAliases_Sorted(t *testing.T) {
 	got := Aliases()
-	want := []string{"approval.list", "document.search", "form.list"}
+	want := []string{"approval.list", "document.create", "document.search", "form.list"}
 	if len(got) != len(want) {
 		t.Fatalf("aliases = %v", got)
 	}
@@ -15,6 +15,25 @@ func TestAliases_Sorted(t *testing.T) {
 		if got[i] != w {
 			t.Errorf("aliases[%d] = %q, want %q", i, got[i], w)
 		}
+	}
+}
+
+func TestLookup_DocumentCreate(t *testing.T) {
+	op, err := Lookup("document.create")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if op["method"] != "POST" {
+		t.Errorf("method = %v", op["method"])
+	}
+	if op["path"] != "/api/v1/documents" {
+		t.Errorf("path = %v", op["path"])
+	}
+	body, _ := op["requestBody"].(map[string]any)
+	props, _ := body["properties"].(map[string]any)
+	rc, _ := props["route_code"].(map[string]any)
+	if rc["required"] != true {
+		t.Errorf("route_code.required = %v", rc["required"])
 	}
 }
 

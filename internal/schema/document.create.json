@@ -1,0 +1,69 @@
+{
+  "method": "POST",
+  "path": "/api/v1/documents",
+  "summary": "書類作成",
+  "description": "書類 (申請または下書き) を新規作成する。フォームコードもしくはフォーム名称と承認ルートコードの指定が必要。\n応答には書類 ID が含まれる (以後の書類操作に必須)。\n\n制約 (抜粋):\n  * 添付ファイル/コメント追加は別 API を使用する。\n  * 各フィールドの初期値・初期取得値は反映されないため、リクエストに含める必要がある。\n  * 管理者設定の編集禁止フィールド・書式チェックは無効化される。\n",
+  "parameters": [],
+  "requestBody": {
+    "contentType": "application/json",
+    "description": "書類作成リクエスト。\nrequired: route_code, datas, および form_code / form_name のいずれか。\n",
+    "properties": {
+      "draft": {
+        "type": "boolean",
+        "description": "下書き保存フラグ (true: 下書き / false: 申請, 既定値は false)"
+      },
+      "form_code": {
+        "type": "string",
+        "description": "フォームコード (form_name と排他、両方指定時は form_name 優先)"
+      },
+      "form_name": {
+        "type": "string",
+        "description": "フォーム名称 (form_code と排他)"
+      },
+      "route_code": {
+        "type": "string",
+        "required": true,
+        "description": "承認ルートコード。ユーザ選択ルートならコード指定、自動選択ルートなら空文字または `--condroute`"
+      },
+      "datas": {
+        "type": "array",
+        "required": true,
+        "description": "書類データ (ページごとにフィールド値を指定)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "page_no": {
+              "type": "integer",
+              "description": "ページ番号"
+            },
+            "fields": {
+              "type": "object",
+              "description": "フィールドID → 値 のマップ。表明細項目は配列で与える。"
+            }
+          }
+        }
+      },
+      "lumpapply": {
+        "type": "boolean",
+        "description": "自動申請設定使用フラグ (true: 使用する / false: 使用しない, 既定値は true)"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "docid": {
+        "type": "integer",
+        "description": "作成された書類ID"
+      },
+      "message_type": {
+        "type": "integer",
+        "description": "メッセージタイプ (3: INFO 固定)"
+      },
+      "message": {
+        "type": "string",
+        "description": "メッセージ内容 (例: 書類が提出されました (ID = 999))"
+      }
+    }
+  }
+}
