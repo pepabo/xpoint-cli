@@ -426,6 +426,86 @@ func (c *Client) GetQuery(ctx context.Context, queryCode string, p GetQueryParam
 	return out, nil
 }
 
+type AddCommentRequest struct {
+	Content      string `json:"content"`
+	AttentionFlg int    `json:"attentionflg"`
+}
+
+type CommentMutationResponse struct {
+	DocID       int    `json:"docid"`
+	Seq         int    `json:"seq"`
+	MessageType int    `json:"message_type"`
+	Message     string `json:"message"`
+}
+
+// AddComment calls POST /api/v1/documents/{docid}/comments.
+func (c *Client) AddComment(ctx context.Context, docID int, req AddCommentRequest) (*CommentMutationResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+	path := fmt.Sprintf("/api/v1/documents/%d/comments", docID)
+	var out CommentMutationResponse
+	if err := c.do(ctx, http.MethodPost, path, nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type Comment struct {
+	SeqNo        string `json:"seqno"`
+	AttentionFlg bool   `json:"attentionflg"`
+	Content      string `json:"content"`
+	WriterName   string `json:"writername"`
+	WriteDate    string `json:"writedate"`
+}
+
+type GetCommentsResponse struct {
+	DocID       int       `json:"docid"`
+	CommentList []Comment `json:"comment_list"`
+}
+
+// GetComments calls GET /api/v1/documents/{docid}/comments.
+func (c *Client) GetComments(ctx context.Context, docID int) (*GetCommentsResponse, error) {
+	path := fmt.Sprintf("/api/v1/documents/%d/comments", docID)
+	var out GetCommentsResponse
+	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateCommentRequest holds the PATCH body for a comment update. Pointers
+// allow selectively updating only one of content / attentionflg.
+type UpdateCommentRequest struct {
+	Content      *string `json:"content,omitempty"`
+	AttentionFlg *int    `json:"attentionflg,omitempty"`
+}
+
+// UpdateComment calls PATCH /api/v1/documents/{docid}/comments/{seq}.
+func (c *Client) UpdateComment(ctx context.Context, docID, seq int, req UpdateCommentRequest) (*CommentMutationResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+	path := fmt.Sprintf("/api/v1/documents/%d/comments/%d", docID, seq)
+	var out CommentMutationResponse
+	if err := c.do(ctx, http.MethodPatch, path, nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteComment calls DELETE /api/v1/documents/{docid}/comments/{seq}.
+func (c *Client) DeleteComment(ctx context.Context, docID, seq int) (*CommentMutationResponse, error) {
+	path := fmt.Sprintf("/api/v1/documents/%d/comments/%d", docID, seq)
+	var out CommentMutationResponse
+	if err := c.do(ctx, http.MethodDelete, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // GetDocumentStatus calls GET /api/v1/documents/{docid}/status.
 // When history is true, approval histories for every version are included.
 // The response shape is complex (form, status, step, flow_results, etc.),
