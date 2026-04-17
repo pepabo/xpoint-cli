@@ -1,0 +1,7 @@
+[tagpr]
+	vPrefix = true
+	releaseBranch = main
+	versionFile = -
+	release = true
+	majorLabels = tagpr:major
+	minorLabels = tagpr:minor
