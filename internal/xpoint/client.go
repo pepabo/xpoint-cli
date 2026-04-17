@@ -249,6 +249,54 @@ func (c *Client) CreateDocument(ctx context.Context, body json.RawMessage) (*Cre
 	return &out, nil
 }
 
+// GetDocument calls GET /api/v1/documents/{docid}.
+// The response varies by form, so it is returned as raw JSON and left for
+// the caller to interpret (typically via --jq or a json output).
+func (c *Client) GetDocument(ctx context.Context, docID int) (json.RawMessage, error) {
+	path := fmt.Sprintf("/api/v1/documents/%d", docID)
+	var out json.RawMessage
+	if err := c.do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+type UpdateDocumentResponse struct {
+	DocID       int    `json:"docid"`
+	MessageType int    `json:"message_type"`
+	Message     string `json:"message"`
+}
+
+// UpdateDocument calls PATCH /api/v1/documents/{docid}.
+// body is the raw JSON request body; it may contain wf_type, datas,
+// route_code, etc. route_code is typically required by the server.
+func (c *Client) UpdateDocument(ctx context.Context, docID int, body json.RawMessage) (*UpdateDocumentResponse, error) {
+	if len(body) == 0 {
+		return nil, fmt.Errorf("request body is required for document update")
+	}
+	path := fmt.Sprintf("/api/v1/documents/%d", docID)
+	var out UpdateDocumentResponse
+	if err := c.do(ctx, http.MethodPatch, path, nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type DeleteDocumentResponse struct {
+	MessageType int    `json:"message_type"`
+	Message     string `json:"message"`
+}
+
+// DeleteDocument calls DELETE /api/v1/documents/{docid}.
+func (c *Client) DeleteDocument(ctx context.Context, docID int) (*DeleteDocumentResponse, error) {
+	path := fmt.Sprintf("/api/v1/documents/%d", docID)
+	var out DeleteDocumentResponse
+	if err := c.do(ctx, http.MethodDelete, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // do executes an HTTP request and decodes a JSON response into out.
 func (c *Client) do(ctx context.Context, method, path string, q url.Values, body []byte, out any) error {
 	u := c.baseURL + path

@@ -1,0 +1,61 @@
+{
+  "method": "GET",
+  "path": "/api/v1/documents/{docid}",
+  "summary": "書類内容取得",
+  "description": "指定された ID の書類内容を取得する。応答にはコメント情報、添付ファイル情報 (メタデータ) も含まれる。添付ファイルの実体は別 API でダウンロードする。\n閲覧権限が必要。OAuth2 認証を利用する場合は対象書類へのアクセス権限が必要。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "description": "書類情報。フォーム定義に依存する可変なデータ構造を持つため、主要なフィールドのみ記載する。",
+    "properties": {
+      "docid": {
+        "type": "integer",
+        "description": "書類ID"
+      },
+      "form": {
+        "type": "object",
+        "description": "フォーム情報 (id, code, name など)"
+      },
+      "route": {
+        "type": "object",
+        "description": "承認ルート情報"
+      },
+      "datas": {
+        "type": "array",
+        "description": "書類データ (ページごと)"
+      },
+      "comments": {
+        "type": "array",
+        "description": "コメント一覧 (本文/投稿者/日時等)"
+      },
+      "attachments": {
+        "type": "array",
+        "description": "添付ファイルのメタデータ一覧"
+      },
+      "status": {
+        "type": "string",
+        "description": "承認状態"
+      },
+      "writer": {
+        "type": "string",
+        "description": "申請者"
+      },
+      "write_datetime": {
+        "type": "string",
+        "description": "申請日時"
+      },
+      "update_datetime": {
+        "type": "string",
+        "description": "更新日時"
+      }
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "method": "PATCH",
+  "path": "/api/v1/documents/{docid}",
+  "summary": "書類更新・ワークフロー操作",
+  "description": "指定された ID の書類に対して、送信されたフィールドのみを更新する。ワークフロー操作 (承認・却下等) のみの実行、または書類データ更新のみの実行が可能。\n更新権限が必要。ワークフロー操作のみを行う場合は `datas` を送信しない。書類データの更新のみを行う場合は `wf_type` を送信しない。\n\n制約 (抜粋):\n  * API では JavaScript、自動計算、マスタ参照、書類制御、ミラーフィールドは実行されない。\n  * 管理者設定の編集禁止フィールド・書式チェックは無効化される。\n",
+  "parameters": [
+    {
+      "name": "docid",
+      "in": "path",
+      "type": "integer",
+      "required": true,
+      "description": "書類ID"
+    }
+  ],
+  "requestBody": {
+    "contentType": "application/json",
+    "description": "書類更新/ワークフロー操作リクエスト。",
+    "properties": {
+      "wf_type": {
+        "type": "integer",
+        "description": "ワークフロー種別 (承認/却下/引戻し等)。書類データ更新のみのときは省略。"
+      },
+      "form_code": {
+        "type": "string",
+        "description": "フォームコード (form_name と排他)"
+      },
+      "form_name": {
+        "type": "string",
+        "description": "フォーム名称 (form_code と排他)"
+      },
+      "route_code": {
+        "type": "string",
+        "required": true,
+        "description": "承認ルートコード"
+      },
+      "datas": {
+        "type": "array",
+        "description": "書類データ (ページごとにフィールド値を指定)。ワークフロー操作のみのときは省略。"
+      },
+      "lumpapply": {
+        "type": "boolean",
+        "description": "自動申請設定使用フラグ"
+      },
+      "wf_comment": {
+        "type": "string",
+        "description": "ワークフローコメント (却下時のコメント等)"
+      },
+      "wf_backstep": {
+        "type": "integer",
+        "description": "戻し先ステップ番号 (却下時)"
+      },
+      "reason": {
+        "type": "string",
+        "description": "更新理由 (操作によっては必須)"
+      }
+    }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "docid": {
+        "type": "integer",
+        "description": "更新された書類ID"
+      },
+      "message_type": {
+        "type": "integer",
+        "description": "メッセージタイプ"
+      },
+      "message": {
+        "type": "string",
+        "description": "メッセージ内容"
+      }
+    }
+  }
+}

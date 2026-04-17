@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -23,6 +24,17 @@ var (
 	docCreateBody   string
 	docCreateOutput string
 	docCreateJQ     string
+
+	docGetOutput string
+	docGetJQ     string
+
+	docEditBody   string
+	docEditOutput string
+	docEditJQ     string
+
+	docDeleteYes    bool
+	docDeleteOutput string
+	docDeleteJQ     string
 )
 
 var documentCmd = &cobra.Command{
@@ -59,10 +71,51 @@ The body must contain route_code, datas, and a form identifier
 	RunE: runDocumentCreate,
 }
 
+var documentGetCmd = &cobra.Command{
+	Use:   "get <docid>",
+	Short: "Get a document",
+	Long: `Retrieve a single document via GET /api/v1/documents/{docid}.
+
+The response varies by form and is returned as JSON; use --jq to extract
+specific fields.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentGet,
+}
+
+var documentEditCmd = &cobra.Command{
+	Use:   "edit <docid>",
+	Short: "Update a document",
+	Long: `Update a document via PATCH /api/v1/documents/{docid}.
+
+The request body is provided with --body, which accepts one of:
+  - inline JSON string                    (e.g. --body '{"route_code":"r1","datas":[...]}')
+  - a path to a JSON file                 (e.g. --body ./patch.json)
+  - "-" to read the body from stdin       (e.g. --body -)
+
+The body may contain wf_type, datas, route_code, wf_comment, reason, etc.
+When performing a workflow-only operation, omit datas.
+See "xp schema document.update" for shape.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentEdit,
+}
+
+var documentDeleteCmd = &cobra.Command{
+	Use:   "delete <docid>",
+	Short: "Delete a document",
+	Long: `Delete a document via DELETE /api/v1/documents/{docid}.
+
+By default the command prompts for confirmation. Pass --yes to skip it.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentDelete,
+}
+
 func init() {
 	rootCmd.AddCommand(documentCmd)
 	documentCmd.AddCommand(documentSearchCmd)
 	documentCmd.AddCommand(documentCreateCmd)
+	documentCmd.AddCommand(documentGetCmd)
+	documentCmd.AddCommand(documentEditCmd)
+	documentCmd.AddCommand(documentDeleteCmd)
 
 	f := documentSearchCmd.Flags()
 	f.StringVar(&docSearchBody, "body", "", "search condition JSON: inline, file path, or - for stdin")
@@ -76,6 +129,20 @@ func init() {
 	cf.StringVar(&docCreateBody, "body", "", "request body JSON: inline, file path, or - for stdin (required)")
 	cf.StringVarP(&docCreateOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
 	cf.StringVar(&docCreateJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	gf := documentGetCmd.Flags()
+	gf.StringVarP(&docGetOutput, "output", "o", "", "output format: json (default)")
+	gf.StringVar(&docGetJQ, "jq", "", "apply a gojq filter to the JSON response")
+
+	ef := documentEditCmd.Flags()
+	ef.StringVar(&docEditBody, "body", "", "request body JSON: inline, file path, or - for stdin (required)")
+	ef.StringVarP(&docEditOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	ef.StringVar(&docEditJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	df := documentDeleteCmd.Flags()
+	df.BoolVarP(&docDeleteYes, "yes", "y", false, "skip the interactive confirmation prompt")
+	df.StringVarP(&docDeleteOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	df.StringVar(&docDeleteJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
 }
 
 func runDocumentSearch(cmd *cobra.Command, args []string) error {
@@ -148,6 +215,108 @@ func runDocumentCreate(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(w, "%d\t%d\t%s\n", res.DocID, res.MessageType, res.Message)
 		return nil
 	})
+}
+
+func runDocumentGet(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	raw, err := client.GetDocument(cmd.Context(), docID)
+	if err != nil {
+		return err
+	}
+
+	if docGetJQ != "" {
+		return runJQ(raw, docGetJQ)
+	}
+	// The response is a complex document; always emit JSON.
+	return writeJSON(os.Stdout, raw)
+}
+
+func runDocumentEdit(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	bodyBytes, err := loadSearchBody(docEditBody)
+	if err != nil {
+		return err
+	}
+	if len(bodyBytes) == 0 {
+		return fmt.Errorf("--body is required for document edit")
+	}
+
+	res, err := client.UpdateDocument(cmd.Context(), docID, bodyBytes)
+	if err != nil {
+		return err
+	}
+
+	return render(res, resolveOutputFormat(docEditOutput), docEditJQ, func() error {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer w.Flush()
+		fmt.Fprintln(w, "DOCID\tMESSAGE_TYPE\tMESSAGE")
+		fmt.Fprintf(w, "%d\t%d\t%s\n", res.DocID, res.MessageType, res.Message)
+		return nil
+	})
+}
+
+func runDocumentDelete(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	if !docDeleteYes {
+		if !confirmDelete(docID) {
+			return fmt.Errorf("aborted")
+		}
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+
+	res, err := client.DeleteDocument(cmd.Context(), docID)
+	if err != nil {
+		return err
+	}
+
+	return render(res, resolveOutputFormat(docDeleteOutput), docDeleteJQ, func() error {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer w.Flush()
+		fmt.Fprintln(w, "MESSAGE_TYPE\tMESSAGE")
+		fmt.Fprintf(w, "%d\t%s\n", res.MessageType, res.Message)
+		return nil
+	})
+}
+
+func parseDocID(s string) (int, error) {
+	n, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("invalid docid %q: must be a positive integer", s)
+	}
+	return n, nil
+}
+
+// confirmDelete prompts on stderr and reads a yes/no answer from stdin.
+// Anything other than "y" / "yes" (case-insensitive) aborts.
+func confirmDelete(docID int) bool {
+	fmt.Fprintf(os.Stderr, "Really delete document %d? [y/N]: ", docID)
+	var ans string
+	_, _ = fmt.Fscanln(os.Stdin, &ans)
+	switch strings.ToLower(strings.TrimSpace(ans)) {
+	case "y", "yes":
+		return true
+	}
+	return false
 }
 
 // loadSearchBody resolves --body into JSON bytes.

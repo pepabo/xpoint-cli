@@ -16,10 +16,13 @@ var schemaCmd = &cobra.Command{
 	Long: `Print the schema object for a given X-point endpoint.
 
 Supported aliases map to the CLI's commands:
-  form.list         GET  /api/v1/forms
-  approval.list     GET  /api/v1/approvals
-  document.search   POST /api/v1/search/documents
-  document.create   POST /api/v1/documents
+  form.list         GET    /api/v1/forms
+  approval.list     GET    /api/v1/approvals
+  document.search   POST   /api/v1/search/documents
+  document.create   POST   /api/v1/documents
+  document.get      GET    /api/v1/documents/{docid}
+  document.update   PATCH  /api/v1/documents/{docid}
+  document.delete   DELETE /api/v1/documents/{docid}
 
 Run without arguments to list supported aliases.`,
 	Args: cobra.MaximumNArgs(1),
