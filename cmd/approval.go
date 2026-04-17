@@ -22,6 +22,17 @@ var (
 	approvalListShowHiddenDoc bool
 	approvalListOutput        string
 	approvalListJQ            string
+
+	approvalWaitFGID   int
+	approvalWaitFID    int
+	approvalWaitStep   int
+	approvalWaitOutput string
+	approvalWaitJQ     string
+
+	approvalHiddenShow      bool
+	approvalHiddenProxyUser string
+	approvalHiddenOutput    string
+	approvalHiddenJQ        string
 )
 
 var approvalCmd = &cobra.Command{
@@ -34,6 +45,24 @@ var approvalListCmd = &cobra.Command{
 	Short: "List approval documents",
 	Long:  "List approval documents via GET /api/v1/approvals.",
 	RunE:  runApprovalList,
+}
+
+var approvalWaitCmd = &cobra.Command{
+	Use:   "wait",
+	Short: "Get approval counts and latest pending documents",
+	Long:  "Fetch approval counts and the latest pending documents via GET /api/v1/approvals/wait.",
+	RunE:  runApprovalWait,
+}
+
+var approvalHiddenCmd = &cobra.Command{
+	Use:   "hidden <docid> [<docid>...]",
+	Short: "Hide or show completed approval documents",
+	Long: `Set the hidden flag on completed approval documents via PUT /api/v1/approvals/hidden.
+
+By default the given document IDs are hidden. Pass --show to restore them.
+Only documents in the "承認完了" (completed) status may be specified.`,
+	Args: cobra.MinimumNArgs(1),
+	RunE: runApprovalHidden,
 }
 
 func init() {
@@ -51,6 +80,21 @@ func init() {
 	f.BoolVar(&approvalListShowHiddenDoc, "show-hidden-doc", false, "include hidden completed documents")
 	f.StringVarP(&approvalListOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
 	f.StringVar(&approvalListJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	approvalCmd.AddCommand(approvalWaitCmd)
+	fw := approvalWaitCmd.Flags()
+	fw.IntVar(&approvalWaitFGID, "fgid", 0, "form group ID (0 = omit)")
+	fw.IntVar(&approvalWaitFID, "fid", 0, "form ID (0 = omit)")
+	fw.IntVar(&approvalWaitStep, "step", 0, "approval step (0 = omit)")
+	fw.StringVarP(&approvalWaitOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	fw.StringVar(&approvalWaitJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	approvalCmd.AddCommand(approvalHiddenCmd)
+	fh := approvalHiddenCmd.Flags()
+	fh.BoolVar(&approvalHiddenShow, "show", false, "show (un-hide) the given documents instead of hiding them")
+	fh.StringVar(&approvalHiddenProxyUser, "proxy-user", "", "proxy approver user code (required when toggling proxy-approved documents)")
+	fh.StringVarP(&approvalHiddenOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
+	fh.StringVar(&approvalHiddenJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
 }
 
 func runApprovalList(cmd *cobra.Command, args []string) error {
@@ -104,6 +148,91 @@ func runApprovalList(cmd *cobra.Command, args []string) error {
 				a.DocID, a.DisplayStatus, a.FormName, a.ApplyUser,
 				strings.Join(a.ApprovalUser, ","), a.ApplyDatetime, a.Title1,
 			)
+		}
+		return nil
+	})
+}
+
+func runApprovalWait(cmd *cobra.Command, args []string) error {
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+
+	var params xpoint.ApprovalsWaitParams
+	if approvalWaitFGID != 0 {
+		v := approvalWaitFGID
+		params.FormGroupID = &v
+	}
+	if approvalWaitFID != 0 {
+		v := approvalWaitFID
+		params.FormID = &v
+	}
+	if approvalWaitStep != 0 {
+		v := approvalWaitStep
+		params.Step = &v
+	}
+
+	res, err := client.GetApprovalsWait(cmd.Context(), params)
+	if err != nil {
+		return err
+	}
+
+	return render(res, resolveOutputFormat(approvalWaitOutput), approvalWaitJQ, func() error {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "TYPE\tNAME\tCOUNT")
+		for _, s := range res.StatusList {
+			fmt.Fprintf(w, "%d\t%s\t%d\n", s.Type, s.Name, s.Count)
+		}
+		w.Flush()
+
+		if len(res.WaitList) > 0 {
+			fmt.Fprintln(os.Stdout)
+			fmt.Fprintln(os.Stdout, "最新の承認待ち書類:")
+			w2 := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w2, "DOCID\tFORM_NAME\tWRITER\tWRITE_DATE\tTITLE")
+			for _, d := range res.WaitList {
+				fmt.Fprintf(w2, "%d\t%s\t%s\t%s\t%s\n", d.DocID, d.Name, d.WriterName, d.WriteDate, d.Title)
+			}
+			w2.Flush()
+		}
+		return nil
+	})
+}
+
+func runApprovalHidden(cmd *cobra.Command, args []string) error {
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+
+	docIDs := make([]int, 0, len(args))
+	for _, a := range args {
+		id, err := parseDocID(a)
+		if err != nil {
+			return fmt.Errorf("invalid docid %q: %w", a, err)
+		}
+		docIDs = append(docIDs, id)
+	}
+
+	req := xpoint.SetApprovalsHiddenRequest{
+		Hidden:    !approvalHiddenShow,
+		DocID:     docIDs,
+		ProxyUser: approvalHiddenProxyUser,
+	}
+
+	res, err := client.SetApprovalsHidden(cmd.Context(), req)
+	if err != nil {
+		return err
+	}
+
+	return render(res, resolveOutputFormat(approvalHiddenOutput), approvalHiddenJQ, func() error {
+		fmt.Fprintf(os.Stdout, "message: %s\n", res.Message)
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer w.Flush()
+		fmt.Fprintln(w, "DOCID")
+		for _, id := range res.DocID {
+			fmt.Fprintf(w, "%d\n", id)
 		}
 		return nil
 	})

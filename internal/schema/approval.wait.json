@@ -1,0 +1,81 @@
+{
+  "method": "GET",
+  "path": "/api/v1/approvals/wait",
+  "summary": "承認待ち件数取得",
+  "description": "PCブラウザのユーザートップ「承認」ガジェット相当の、11種類の承認状況別件数、および最新の承認待ち書類5件の情報を取得する。",
+  "parameters": [
+    {
+      "name": "fgid",
+      "in": "query",
+      "type": "integer",
+      "description": "フォームグループID で絞り込み"
+    },
+    {
+      "name": "fid",
+      "in": "query",
+      "type": "integer",
+      "description": "フォームID で絞り込み (fgid が指定されているときのみ有効)"
+    },
+    {
+      "name": "step",
+      "in": "query",
+      "type": "integer",
+      "description": "ステップ番号で絞り込み (fgid と fid が指定されているときのみ有効)"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "status_list": {
+        "type": "array",
+        "description": "承認状況別の件数リスト",
+        "items": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "integer",
+              "description": "承認状況種別 (0:承認待ち / 1:差し戻され / 2:下書き / 3:保留 / 4:承認中(申請) / 5:差し戻し / 6:承認完了(申請) / 7:却下 / 8:回覧 / 9:承認中(承認) / 10:承認完了(承認))"
+            },
+            "name": {
+              "type": "string",
+              "description": "承認状況名称"
+            },
+            "count": {
+              "type": "integer",
+              "description": "件数"
+            }
+          }
+        }
+      },
+      "wait_list": {
+        "type": "array",
+        "description": "最新の承認待ち書類5件",
+        "items": {
+          "type": "object",
+          "properties": {
+            "docid": {
+              "type": "integer",
+              "description": "書類ID"
+            },
+            "name": {
+              "type": "string",
+              "description": "フォーム名称"
+            },
+            "title": {
+              "type": "string",
+              "description": "件名"
+            },
+            "writername": {
+              "type": "string",
+              "description": "申請者名"
+            },
+            "writedate": {
+              "type": "string",
+              "description": "申請日時 (YYYY/MM/DD hh:mm:ss)"
+            }
+          }
+        }
+      }
+    }
+  }
+}

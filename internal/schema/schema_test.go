@@ -8,7 +8,9 @@ import (
 func TestAliases_Sorted(t *testing.T) {
 	got := Aliases()
 	want := []string{
+		"approval.hidden",
 		"approval.list",
+		"approval.wait",
 		"document.attachment.add",
 		"document.attachment.delete",
 		"document.attachment.get",
