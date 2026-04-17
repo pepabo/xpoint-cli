@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: test
+  ci:
+    name: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,20 +20,13 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - run: go build ./...
-      - run: go test -race ./...
-
-  lint:
-    name: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
         with:
-          go-version-file: go.mod
-          cache: false
+          version: v2.11.3
 
-      - uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test -race ./...
