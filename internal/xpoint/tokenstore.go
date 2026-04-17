@@ -13,6 +13,11 @@ import (
 // Manager on Windows).
 const keyringService = "xpoint-cli"
 
+// defaultSubdomainKey holds the most recently logged-in subdomain so that
+// commands can fall back to it when XPOINT_SUBDOMAIN is not set. Prefixed
+// with underscores to avoid collision with real DNS labels.
+const defaultSubdomainKey = "__default_subdomain__"
+
 // ErrTokenNotFound is returned when no token is stored for a subdomain.
 var ErrTokenNotFound = errors.New("no stored token found")
 
@@ -38,7 +43,23 @@ func SaveToken(t *StoredToken) error {
 	if err := keyring.Set(keyringService, t.Subdomain, string(b)); err != nil {
 		return fmt.Errorf("store token in keyring: %w", err)
 	}
+	if err := keyring.Set(keyringService, defaultSubdomainKey, t.Subdomain); err != nil {
+		return fmt.Errorf("store default subdomain in keyring: %w", err)
+	}
 	return nil
+}
+
+// LoadDefaultSubdomain returns the most recently saved subdomain, or empty
+// string when no login has been recorded.
+func LoadDefaultSubdomain() (string, error) {
+	v, err := keyring.Get(keyringService, defaultSubdomainKey)
+	if err != nil {
+		if errors.Is(err, keyring.ErrNotFound) {
+			return "", nil
+		}
+		return "", fmt.Errorf("read default subdomain from keyring: %w", err)
+	}
+	return v, nil
 }
 
 // LoadToken retrieves the token stored for subdomain. Returns ErrTokenNotFound

@@ -54,11 +54,13 @@ func pick(flagVal, envKey string) string {
 }
 
 func resolveSubdomain() (string, error) {
-	s := pick(flagSubdomain, "XPOINT_SUBDOMAIN")
-	if s == "" {
-		return "", errors.New("subdomain is required: set --xpoint-subdomain or XPOINT_SUBDOMAIN")
+	if s := pick(flagSubdomain, "XPOINT_SUBDOMAIN"); s != "" {
+		return s, nil
 	}
-	return s, nil
+	if s, err := xpoint.LoadDefaultSubdomain(); err == nil && s != "" {
+		return s, nil
+	}
+	return "", errors.New("subdomain is required: set --xpoint-subdomain or XPOINT_SUBDOMAIN, or run 'xp auth login' first")
 }
 
 // authFromFlags returns the credential supplied via --xpoint-* command-line

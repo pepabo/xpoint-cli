@@ -72,6 +72,37 @@ func TestDeleteToken(t *testing.T) {
 	}
 }
 
+func TestDefaultSubdomain(t *testing.T) {
+	keyring.MockInit()
+
+	// Empty when nothing saved.
+	got, err := LoadDefaultSubdomain()
+	if err != nil {
+		t.Fatalf("LoadDefaultSubdomain: %v", err)
+	}
+	if got != "" {
+		t.Errorf("got %q, want empty", got)
+	}
+
+	// SaveToken records the default.
+	if err := SaveToken(&StoredToken{Subdomain: "acme", ClientID: "c", Token: Token{AccessToken: "AT"}}); err != nil {
+		t.Fatalf("SaveToken: %v", err)
+	}
+	got, err = LoadDefaultSubdomain()
+	if err != nil || got != "acme" {
+		t.Errorf("got %q err=%v, want acme", got, err)
+	}
+
+	// A subsequent login overwrites the default.
+	if err := SaveToken(&StoredToken{Subdomain: "other", ClientID: "c", Token: Token{AccessToken: "AT"}}); err != nil {
+		t.Fatalf("SaveToken: %v", err)
+	}
+	got, _ = LoadDefaultSubdomain()
+	if got != "other" {
+		t.Errorf("got %q, want other", got)
+	}
+}
+
 func TestLoadToken_RejectsEmptyAccessToken(t *testing.T) {
 	keyring.MockInit()
 	in := &StoredToken{Subdomain: "acme", ClientID: "c"}

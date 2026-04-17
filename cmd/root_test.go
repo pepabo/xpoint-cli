@@ -230,6 +230,7 @@ func TestLoadStoredTokenAuth_NotFound(t *testing.T) {
 
 func TestResolveSubdomain(t *testing.T) {
 	resetAuthFlags()
+	keyring.MockInit()
 	t.Setenv("XPOINT_SUBDOMAIN", "sub1")
 	sub, err := resolveSubdomain()
 	if err != nil {
@@ -240,8 +241,33 @@ func TestResolveSubdomain(t *testing.T) {
 	}
 
 	resetAuthFlags()
+	keyring.MockInit()
 	t.Setenv("XPOINT_SUBDOMAIN", "")
 	if _, err := resolveSubdomain(); err == nil {
-		t.Error("expected error when subdomain missing")
+		t.Error("expected error when subdomain missing and no keyring default")
+	}
+}
+
+// TestResolveSubdomain_KeyringFallback verifies that resolveSubdomain falls
+// back to the last-logged-in subdomain recorded in the keyring when no flag
+// or environment variable is set.
+func TestResolveSubdomain_KeyringFallback(t *testing.T) {
+	resetAuthFlags()
+	keyring.MockInit()
+	t.Setenv("XPOINT_SUBDOMAIN", "")
+	_ = xpoint.SaveToken(&xpoint.StoredToken{
+		Subdomain: "saved", ClientID: "c", Token: xpoint.Token{AccessToken: "AT"},
+	})
+	sub, err := resolveSubdomain()
+	if err != nil || sub != "saved" {
+		t.Errorf("sub=%q err=%v, want saved", sub, err)
+	}
+
+	// An explicit flag still beats the keyring default.
+	resetAuthFlags()
+	flagSubdomain = "explicit"
+	sub, err = resolveSubdomain()
+	if err != nil || sub != "explicit" {
+		t.Errorf("sub=%q err=%v, want explicit", sub, err)
 	}
 }
