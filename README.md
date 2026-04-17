@@ -44,7 +44,7 @@ xp auth login \
 
 ブラウザを起動したくない場合は `--no-browser` を付けると URL が表示されます。
 
-一度ログインすると、アクセストークン・リフレッシュトークンはサブドメインをキーにシステムキーリング（Linux: Secret Service / macOS: Keychain / Windows: Credential Manager）へ保存され、以降のコマンドで自動利用されます。`XPOINT_SUBDOMAIN` の指定も最後にログインした値が利用されるため省略可能です。
+一度ログインすると、サブドメイン・アクセストークン・リフレッシュトークンはシステムキーリング（Linux: Secret Service / macOS: Keychain / Windows: Credential Manager）に単一のエントリとして保存され、以降のコマンドで自動利用されます。`XPOINT_SUBDOMAIN` も保存済みの値が使われるため省略可能です。複数アカウントの同時保存には対応しておらず、`xp auth login` は常に既存のエントリを上書きします。
 
 保存済みトークンを確認:
 

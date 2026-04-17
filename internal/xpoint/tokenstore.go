@@ -8,22 +8,23 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-// keyringService is the service name used for all xpoint-cli entries in the
+// keyringService is the service name used for the xpoint-cli entry in the
 // system keyring (Secret Service on Linux, Keychain on macOS, Credential
 // Manager on Windows).
 const keyringService = "xpoint-cli"
 
-// defaultSubdomainKey holds the most recently logged-in subdomain so that
-// commands can fall back to it when XPOINT_SUBDOMAIN is not set. Prefixed
-// with underscores to avoid collision with real DNS labels.
-const defaultSubdomainKey = "__default_subdomain__"
+// keyringAccount is the fixed account/key under which the single login
+// record is stored. xpoint-cli does not support multiple concurrent logins,
+// so every `xp auth login` overwrites this one entry.
+const keyringAccount = "default"
 
-// ErrTokenNotFound is returned when no token is stored for a subdomain.
+// ErrTokenNotFound is returned when no login has been recorded.
 var ErrTokenNotFound = errors.New("no stored token found")
 
-// StoredToken is the persisted representation of an OAuth token together with
-// the subdomain it was issued for. The client_id is captured so a subsequent
-// refresh can be performed without the user re-supplying it.
+// StoredToken is the persisted representation of a login: the OAuth token
+// plus the subdomain, domain code, and client ID it was issued for. The
+// latter three allow a later command to refresh the token and issue
+// requests without the user re-supplying any flags or env vars.
 type StoredToken struct {
 	Subdomain  string `json:"subdomain"`
 	DomainCode string `json:"domain_code,omitempty"`
@@ -31,7 +32,9 @@ type StoredToken struct {
 	Token
 }
 
-// SaveToken stores the token in the system keyring keyed by t.Subdomain.
+// SaveToken overwrites the single stored login. t.Subdomain is required
+// because commands use it to build request URLs; the other fields may be
+// empty if the caller has nothing to record for them.
 func SaveToken(t *StoredToken) error {
 	if t.Subdomain == "" {
 		return errors.New("StoredToken.Subdomain is required")
@@ -40,35 +43,16 @@ func SaveToken(t *StoredToken) error {
 	if err != nil {
 		return fmt.Errorf("encode token: %w", err)
 	}
-	if err := keyring.Set(keyringService, t.Subdomain, string(b)); err != nil {
+	if err := keyring.Set(keyringService, keyringAccount, string(b)); err != nil {
 		return fmt.Errorf("store token in keyring: %w", err)
-	}
-	if err := keyring.Set(keyringService, defaultSubdomainKey, t.Subdomain); err != nil {
-		return fmt.Errorf("store default subdomain in keyring: %w", err)
 	}
 	return nil
 }
 
-// LoadDefaultSubdomain returns the most recently saved subdomain, or empty
-// string when no login has been recorded.
-func LoadDefaultSubdomain() (string, error) {
-	v, err := keyring.Get(keyringService, defaultSubdomainKey)
-	if err != nil {
-		if errors.Is(err, keyring.ErrNotFound) {
-			return "", nil
-		}
-		return "", fmt.Errorf("read default subdomain from keyring: %w", err)
-	}
-	return v, nil
-}
-
-// LoadToken retrieves the token stored for subdomain. Returns ErrTokenNotFound
-// (matched via errors.Is) when no entry exists.
-func LoadToken(subdomain string) (*StoredToken, error) {
-	if subdomain == "" {
-		return nil, errors.New("subdomain is required to load a token")
-	}
-	raw, err := keyring.Get(keyringService, subdomain)
+// LoadToken returns the stored login, or ErrTokenNotFound (matched via
+// errors.Is) when no entry exists.
+func LoadToken() (*StoredToken, error) {
+	raw, err := keyring.Get(keyringService, keyringAccount)
 	if err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
 			return nil, ErrTokenNotFound
@@ -79,19 +63,13 @@ func LoadToken(subdomain string) (*StoredToken, error) {
 	if err := json.Unmarshal([]byte(raw), &t); err != nil {
 		return nil, fmt.Errorf("decode token from keyring: %w", err)
 	}
-	if t.AccessToken == "" {
-		return nil, errors.New("stored token does not contain an access token")
-	}
 	return &t, nil
 }
 
-// DeleteToken removes the token entry for subdomain. Missing entries are not
-// treated as an error.
-func DeleteToken(subdomain string) error {
-	if subdomain == "" {
-		return errors.New("subdomain is required to delete a token")
-	}
-	if err := keyring.Delete(keyringService, subdomain); err != nil {
+// DeleteToken removes the stored login. Missing entries are not treated as
+// an error.
+func DeleteToken() error {
+	if err := keyring.Delete(keyringService, keyringAccount); err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
 			return nil
 		}

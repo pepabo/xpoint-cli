@@ -27,7 +27,7 @@ func TestSaveLoadTokenRoundtrip(t *testing.T) {
 		t.Fatalf("SaveToken: %v", err)
 	}
 
-	out, err := LoadToken("acme")
+	out, err := LoadToken()
 	if err != nil {
 		t.Fatalf("LoadToken: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestSaveLoadTokenRoundtrip(t *testing.T) {
 
 func TestLoadToken_NotFound(t *testing.T) {
 	keyring.MockInit()
-	_, err := LoadToken("absent")
+	_, err := LoadToken()
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -60,56 +60,34 @@ func TestDeleteToken(t *testing.T) {
 	if err := SaveToken(in); err != nil {
 		t.Fatalf("SaveToken: %v", err)
 	}
-	if err := DeleteToken("acme"); err != nil {
+	if err := DeleteToken(); err != nil {
 		t.Fatalf("DeleteToken: %v", err)
 	}
-	if _, err := LoadToken("acme"); !errors.Is(err, ErrTokenNotFound) {
+	if _, err := LoadToken(); !errors.Is(err, ErrTokenNotFound) {
 		t.Errorf("expected ErrTokenNotFound after delete, got %v", err)
 	}
 	// Deleting a missing entry should be a no-op.
-	if err := DeleteToken("acme"); err != nil {
+	if err := DeleteToken(); err != nil {
 		t.Errorf("DeleteToken on missing entry should not error, got %v", err)
 	}
 }
 
-func TestDefaultSubdomain(t *testing.T) {
+// TestSaveToken_Overwrites verifies that SaveToken always overwrites the
+// single stored entry; xpoint-cli does not support concurrent logins.
+func TestSaveToken_Overwrites(t *testing.T) {
 	keyring.MockInit()
 
-	// Empty when nothing saved.
-	got, err := LoadDefaultSubdomain()
-	if err != nil {
-		t.Fatalf("LoadDefaultSubdomain: %v", err)
-	}
-	if got != "" {
-		t.Errorf("got %q, want empty", got)
-	}
-
-	// SaveToken records the default.
 	if err := SaveToken(&StoredToken{Subdomain: "acme", ClientID: "c", Token: Token{AccessToken: "AT"}}); err != nil {
 		t.Fatalf("SaveToken: %v", err)
 	}
-	got, err = LoadDefaultSubdomain()
-	if err != nil || got != "acme" {
-		t.Errorf("got %q err=%v, want acme", got, err)
-	}
-
-	// A subsequent login overwrites the default.
-	if err := SaveToken(&StoredToken{Subdomain: "other", ClientID: "c", Token: Token{AccessToken: "AT"}}); err != nil {
+	if err := SaveToken(&StoredToken{Subdomain: "other", ClientID: "c2", Token: Token{AccessToken: "AT2"}}); err != nil {
 		t.Fatalf("SaveToken: %v", err)
 	}
-	got, _ = LoadDefaultSubdomain()
-	if got != "other" {
-		t.Errorf("got %q, want other", got)
+	got, err := LoadToken()
+	if err != nil {
+		t.Fatalf("LoadToken: %v", err)
 	}
-}
-
-func TestLoadToken_RejectsEmptyAccessToken(t *testing.T) {
-	keyring.MockInit()
-	in := &StoredToken{Subdomain: "acme", ClientID: "c"}
-	if err := SaveToken(in); err != nil {
-		t.Fatalf("SaveToken: %v", err)
-	}
-	if _, err := LoadToken("acme"); err == nil {
-		t.Error("expected error when stored token has no access token")
+	if got.Subdomain != "other" || got.ClientID != "c2" || got.AccessToken != "AT2" {
+		t.Errorf("got %+v, want the most recently saved token", got)
 	}
 }
