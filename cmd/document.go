@@ -38,6 +38,9 @@ var (
 	docDeleteJQ     string
 
 	docDownloadOutput string
+
+	docStatusHistory bool
+	docStatusJQ      string
 )
 
 var documentCmd = &cobra.Command{
@@ -112,6 +115,18 @@ By default the command prompts for confirmation. Pass --yes to skip it.`,
 	RunE: runDocumentDelete,
 }
 
+var documentStatusCmd = &cobra.Command{
+	Use:   "status <docid>",
+	Short: "Get document approval status",
+	Long: `Retrieve the approval status of a document via GET /api/v1/documents/{docid}/status.
+
+The response is returned as JSON and contains the current status, step,
+writer, last approver, and the approval flow. Pass --history to include
+approval histories for all past versions.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDocumentStatus,
+}
+
 var documentDownloadCmd = &cobra.Command{
 	Use:   "download <docid>",
 	Short: "Download a document as PDF",
@@ -133,6 +148,7 @@ func init() {
 	documentCmd.AddCommand(documentGetCmd)
 	documentCmd.AddCommand(documentEditCmd)
 	documentCmd.AddCommand(documentDeleteCmd)
+	documentCmd.AddCommand(documentStatusCmd)
 	documentCmd.AddCommand(documentDownloadCmd)
 
 	f := documentSearchCmd.Flags()
@@ -161,6 +177,10 @@ func init() {
 	df.BoolVarP(&docDeleteYes, "yes", "y", false, "skip the interactive confirmation prompt")
 	df.StringVarP(&docDeleteOutput, "output", "o", "", "output format: table|json (default: table on TTY, json otherwise)")
 	df.StringVar(&docDeleteJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
+
+	sf := documentStatusCmd.Flags()
+	sf.BoolVar(&docStatusHistory, "history", false, "include approval histories for all versions")
+	sf.StringVar(&docStatusJQ, "jq", "", "apply a gojq filter to the JSON response")
 
 	dlf := documentDownloadCmd.Flags()
 	dlf.StringVarP(&docDownloadOutput, "output", "o", "", "output path: FILE, DIR/, or - for stdout (default: server-provided filename in current directory)")
@@ -331,6 +351,25 @@ func runDocumentDelete(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(w, "%d\t%s\n", res.MessageType, res.Message)
 		return nil
 	})
+}
+
+func runDocumentStatus(cmd *cobra.Command, args []string) error {
+	docID, err := parseDocID(args[0])
+	if err != nil {
+		return err
+	}
+	client, err := newClientFromFlags(cmd.Context())
+	if err != nil {
+		return err
+	}
+	raw, err := client.GetDocumentStatus(cmd.Context(), docID, docStatusHistory)
+	if err != nil {
+		return err
+	}
+	if docStatusJQ != "" {
+		return runJQ(raw, docStatusJQ)
+	}
+	return writeJSON(os.Stdout, raw)
 }
 
 func runDocumentDownload(cmd *cobra.Command, args []string) error {

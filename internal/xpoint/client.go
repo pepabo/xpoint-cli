@@ -355,6 +355,24 @@ func (c *Client) DeleteDocument(ctx context.Context, docID int) (*DeleteDocument
 	return &out, nil
 }
 
+// GetDocumentStatus calls GET /api/v1/documents/{docid}/status.
+// When history is true, approval histories for every version are included.
+// The response shape is complex (form, status, step, flow_results, etc.),
+// so it is returned as raw JSON for the caller to interpret.
+func (c *Client) GetDocumentStatus(ctx context.Context, docID int, history bool) (json.RawMessage, error) {
+	path := fmt.Sprintf("/api/v1/documents/%d/status", docID)
+	var q url.Values
+	if history {
+		q = url.Values{}
+		q.Set("history", "true")
+	}
+	var out json.RawMessage
+	if err := c.do(ctx, http.MethodGet, path, q, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DownloadPDF calls GET /api/v1/documents/{docid}/pdf and returns the PDF
 // bytes and the server-provided filename (parsed from Content-Disposition,
 // which may use RFC 5987 encoding). The filename is empty when the server
