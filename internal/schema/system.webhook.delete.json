@@ -1,0 +1,33 @@
+{
+  "method": "DELETE",
+  "path": "/api/v1/system/{fid}/webhooks/{webhookId}",
+  "summary": "Webhook設定削除",
+  "description": "指定したフォームの指定した Webhook 設定を削除する。\nfqdn の指定が必須で、指定 FQDN と設定中の送信先URLの FQDN が完全一致する場合のみ削除可能。\n管理者権限が必要。\n",
+  "parameters": [
+    {
+      "name": "fid",
+      "in": "path",
+      "required": true,
+      "type": "integer",
+      "description": "フォームID"
+    },
+    {
+      "name": "webhookId",
+      "in": "path",
+      "required": true,
+      "type": "string",
+      "description": "Webhook ID"
+    },
+    {
+      "name": "fqdn",
+      "in": "query",
+      "required": true,
+      "type": "string",
+      "description": "削除対象の Webhook 送信先 FQDN (例: example.com)"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "description": "削除成功時のレスポンス"
+  }
+}

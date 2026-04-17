@@ -1,0 +1,41 @@
+{
+  "method": "GET",
+  "path": "/api/v1/system/{fid}/webhooks",
+  "summary": "Webhook設定取得",
+  "description": "指定したフォームの Webhook 設定情報を取得する。\nfqdn の指定が必須で、指定 FQDN と送信先URLの FQDN が完全一致する設定のみ取得する。\n管理者権限が必要。\n",
+  "parameters": [
+    {
+      "name": "fid",
+      "in": "path",
+      "required": true,
+      "type": "integer",
+      "description": "フォームID"
+    },
+    {
+      "name": "fqdn",
+      "in": "query",
+      "required": true,
+      "type": "string",
+      "description": "取得対象の Webhook 送信先 FQDN (例: example.com)"
+    }
+  ],
+  "response": {
+    "type": "object",
+    "properties": {
+      "form_name": { "type": "string", "description": "フォーム名称" },
+      "form_type": { "type": "string", "description": "フォーム種別: standard | workflow" },
+      "webhooks": {
+        "type": "array",
+        "description": "Webhook 設定 (存在しない場合は空配列)",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer", "description": "Webhook ID" },
+            "url": { "type": "string", "description": "送信先URL" },
+            "remarks": { "type": "string", "description": "備考" }
+          }
+        }
+      }
+    }
+  }
+}

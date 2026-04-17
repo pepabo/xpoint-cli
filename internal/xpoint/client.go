@@ -456,6 +456,86 @@ func (c *Client) GetWebhooklog(ctx context.Context, uuid string) (json.RawMessag
 	return out, nil
 }
 
+type WebhookConfig struct {
+	ID      int    `json:"id"`
+	URL     string `json:"url"`
+	Remarks string `json:"remarks,omitempty"`
+}
+
+type WebhookListResponse struct {
+	FormName string          `json:"form_name"`
+	FormType string          `json:"form_type"`
+	Webhooks []WebhookConfig `json:"webhooks"`
+}
+
+// ListWebhookConfigs calls GET /api/v1/system/{fid}/webhooks (admin). The
+// fqdn query parameter is required; only configs whose destination URL FQDN
+// exactly matches fqdn are returned.
+func (c *Client) ListWebhookConfigs(ctx context.Context, formID int, fqdn string) (*WebhookListResponse, error) {
+	path := fmt.Sprintf("/api/v1/system/%d/webhooks", formID)
+	q := url.Values{}
+	q.Set("fqdn", fqdn)
+	var out WebhookListResponse
+	if err := c.do(ctx, http.MethodGet, path, q, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type CreateWebhookRequest struct {
+	URL     string `json:"url"`
+	Remarks string `json:"remarks,omitempty"`
+}
+
+// CreateWebhookConfig calls POST /api/v1/system/{fid}/webhooks (admin).
+func (c *Client) CreateWebhookConfig(ctx context.Context, formID int, req CreateWebhookRequest) (*WebhookConfig, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+	path := fmt.Sprintf("/api/v1/system/%d/webhooks", formID)
+	var out WebhookConfig
+	if err := c.do(ctx, http.MethodPost, path, nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+type UpdateWebhookRequest struct {
+	FQDN    string  `json:"fqdn"`
+	URL     *string `json:"url,omitempty"`
+	Remarks *string `json:"remarks,omitempty"`
+}
+
+// UpdateWebhookConfig calls PATCH /api/v1/system/{fid}/webhooks/{webhookId}
+// (admin). FQDN is required and must match the current destination URL FQDN.
+func (c *Client) UpdateWebhookConfig(ctx context.Context, formID int, webhookID string, req UpdateWebhookRequest) (*WebhookConfig, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+	path := fmt.Sprintf("/api/v1/system/%d/webhooks/%s", formID, url.PathEscape(webhookID))
+	var out WebhookConfig
+	if err := c.do(ctx, http.MethodPatch, path, nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteWebhookConfig calls DELETE /api/v1/system/{fid}/webhooks/{webhookId}
+// (admin). The fqdn query parameter is required and must match the current
+// destination URL FQDN. Returns the raw response body for diagnostic output.
+func (c *Client) DeleteWebhookConfig(ctx context.Context, formID int, webhookID, fqdn string) (json.RawMessage, error) {
+	path := fmt.Sprintf("/api/v1/system/%d/webhooks/%s", formID, url.PathEscape(webhookID))
+	q := url.Values{}
+	q.Set("fqdn", fqdn)
+	var out json.RawMessage
+	if err := c.do(ctx, http.MethodDelete, path, q, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 type Approval struct {
 	DocID            int      `json:"docid"`
 	Hidden           *bool    `json:"hidden,omitempty"`
