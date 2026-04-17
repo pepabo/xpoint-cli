@@ -1,12 +1,194 @@
 package cmd
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// resetSearchFlags returns the package-level docSearch* variables to their
+// zero values so each test starts from a clean slate.
+func resetSearchFlags(t *testing.T) {
+	t.Helper()
+	docSearchBody = ""
+	docSearchTitle = ""
+	docSearchFormName = ""
+	docSearchFormID = 0
+	docSearchFGID = 0
+	docSearchWriters = nil
+	docSearchGroups = nil
+	docSearchMe = false
+	docSearchSince = ""
+	docSearchUntil = ""
+	flagUser = ""
+	t.Cleanup(func() {
+		docSearchBody = ""
+		docSearchTitle = ""
+		docSearchFormName = ""
+		docSearchFormID = 0
+		docSearchFGID = 0
+		docSearchWriters = nil
+		docSearchGroups = nil
+		docSearchMe = false
+		docSearchSince = ""
+		docSearchUntil = ""
+		flagUser = ""
+	})
+}
+
+func TestBuildSearchBody_TitleAndForm(t *testing.T) {
+	resetSearchFlags(t)
+	docSearchTitle = "経費"
+	docSearchFormName = "稟議"
+	docSearchFormID = 42
+	docSearchFGID = 7
+
+	raw, err := buildSearchBodyFromFlags()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got["title"] != "経費" {
+		t.Errorf("title = %v", got["title"])
+	}
+	if got["form_name"] != "稟議" {
+		t.Errorf("form_name = %v", got["form_name"])
+	}
+	if got["fid"] != float64(42) {
+		t.Errorf("fid = %v", got["fid"])
+	}
+	if got["fgid"] != float64(7) {
+		t.Errorf("fgid = %v", got["fgid"])
+	}
+}
+
+func TestBuildSearchBody_Writers(t *testing.T) {
+	resetSearchFlags(t)
+	docSearchWriters = []string{"u1", "u2"}
+	docSearchGroups = []string{"g1"}
+
+	raw, err := buildSearchBodyFromFlags()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	var got struct {
+		WriterList []struct {
+			Type string `json:"type"`
+			Code string `json:"code"`
+		} `json:"writer_list"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(got.WriterList) != 3 {
+		t.Fatalf("writer_list = %+v", got.WriterList)
+	}
+	if got.WriterList[0] != (struct {
+		Type string `json:"type"`
+		Code string `json:"code"`
+	}{"user", "u1"}) {
+		t.Errorf("writer[0] = %+v", got.WriterList[0])
+	}
+	if got.WriterList[2].Type != "group" || got.WriterList[2].Code != "g1" {
+		t.Errorf("writer[2] = %+v", got.WriterList[2])
+	}
+}
+
+func TestBuildSearchBody_MeRequiresUser(t *testing.T) {
+	resetSearchFlags(t)
+	docSearchMe = true
+
+	_, err := buildSearchBodyFromFlags()
+	if err == nil || !strings.Contains(err.Error(), "--me requires") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestBuildSearchBody_MeWithFlagUser(t *testing.T) {
+	resetSearchFlags(t)
+	docSearchMe = true
+	flagUser = "alice"
+
+	raw, err := buildSearchBodyFromFlags()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if !strings.Contains(string(raw), `"code":"alice"`) {
+		t.Errorf("body missing current user: %s", string(raw))
+	}
+}
+
+func TestBuildSearchBody_MeFromEnv(t *testing.T) {
+	resetSearchFlags(t)
+	docSearchMe = true
+	t.Setenv("XPOINT_USER", "bob")
+
+	raw, err := buildSearchBodyFromFlags()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if !strings.Contains(string(raw), `"code":"bob"`) {
+		t.Errorf("body missing env user: %s", string(raw))
+	}
+}
+
+func TestBuildSearchBody_SinceUntil(t *testing.T) {
+	resetSearchFlags(t)
+	docSearchSince = "2024-01-15"
+	docSearchUntil = "2024-12-31"
+
+	raw, err := buildSearchBodyFromFlags()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got["date_type"] != "cr_dt" {
+		t.Errorf("date_type = %v", got["date_type"])
+	}
+	if got["dt_cond_type"] != "1" {
+		t.Errorf("dt_cond_type = %v", got["dt_cond_type"])
+	}
+	if got["lower_year"] != float64(2024) || got["lower_month"] != float64(1) || got["lower_day"] != float64(15) {
+		t.Errorf("lower_* = %v / %v / %v", got["lower_year"], got["lower_month"], got["lower_day"])
+	}
+	if got["upper_year"] != float64(2024) || got["upper_month"] != float64(12) || got["upper_day"] != float64(31) {
+		t.Errorf("upper_* = %v / %v / %v", got["upper_year"], got["upper_month"], got["upper_day"])
+	}
+}
+
+func TestBuildSearchBody_InvalidSince(t *testing.T) {
+	resetSearchFlags(t)
+	docSearchSince = "2024/01/15"
+
+	_, err := buildSearchBodyFromFlags()
+	if err == nil || !strings.Contains(err.Error(), "--since") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestRunDocumentSearch_BodyAndFilterConflict(t *testing.T) {
+	resetSearchFlags(t)
+	t.Setenv("XPOINT_SUBDOMAIN", "acme")
+	t.Setenv("XPOINT_API_ACCESS_TOKEN", "tok")
+	t.Setenv("XPOINT_GENERIC_API_TOKEN", "")
+
+	docSearchBody = `{"title":"x"}`
+	docSearchTitle = "y"
+
+	err := runDocumentSearch(documentSearchCmd, nil)
+	if err == nil || !strings.Contains(err.Error(), "cannot be combined") {
+		t.Errorf("err = %v", err)
+	}
+}
 
 func TestResolveDownloadPath_DefaultUsesServerName(t *testing.T) {
 	got := resolveDownloadPath("", "経費.pdf", 42)
