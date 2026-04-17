@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"text/tabwriter"
 
 	"github.com/pepabo/xpoint-cli/internal/xpoint"
 	"github.com/spf13/cobra"
@@ -74,20 +73,17 @@ func runSystemFormList(cmd *cobra.Command, args []string) error {
 	}
 
 	return render(res, resolveOutputFormat(systemFormListOutput), systemFormListJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "GROUP_ID\tGROUP_NAME\tFORMS\tFORM_ID\tFORM_CODE\tFORM_NAME\tPAGES\tTABLE")
+		w := newTable(os.Stdout, "GROUP_ID", "GROUP_NAME", "FORMS", "FORM_ID", "FORM_CODE", "FORM_NAME", "PAGES", "TABLE")
 		for _, g := range res.FormGroup {
 			if len(g.Form) == 0 {
-				fmt.Fprintf(w, "%s\t%s\t%d\t-\t-\t-\t-\t-\n", g.ID, g.Name, g.FormCount)
+				w.AddRow(g.ID, g.Name, g.FormCount, "-", "-", "-", "-", "-")
 				continue
 			}
 			for _, f := range g.Form {
-				fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%s\t%s\t%d\t%s\n",
-					g.ID, g.Name, g.FormCount, f.ID, f.Code, f.Name, f.PageCount, f.TableName,
-				)
+				w.AddRow(g.ID, g.Name, g.FormCount, f.ID, f.Code, f.Name, f.PageCount, f.TableName)
 			}
 		}
+		w.Print()
 		return nil
 	})
 }
@@ -111,16 +107,13 @@ func runSystemFormShow(cmd *cobra.Command, args []string) error {
 	return render(res, resolveOutputFormat(systemFormShowOutput), systemFormShowJQ, func() error {
 		form := res.Form
 		fmt.Fprintf(os.Stdout, "FORM: %s  %s  MAX_STEP: %d\n", form.Code, form.Name, form.MaxStep)
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "PAGE\tFIELD_ID\tTYPE\tREQUIRED\tUNIQUE\tARRAYSIZE\tLABEL")
+		w := newTable(os.Stdout, "PAGE", "FIELD_ID", "TYPE", "REQUIRED", "UNIQUE", "ARRAYSIZE", "LABEL")
 		for _, p := range form.Pages {
 			for _, f := range p.Fields {
-				fmt.Fprintf(w, "%d\t%s\t%d\t%t\t%t\t%d\t%s\n",
-					p.PageNo, f.FieldID, f.FieldType, f.Required, f.Unique, f.ArraySize, f.Label,
-				)
+				w.AddRow(p.PageNo, f.FieldID, f.FieldType, f.Required, f.Unique, f.ArraySize, f.Label)
 			}
 		}
+		w.Print()
 		return nil
 	})
 }

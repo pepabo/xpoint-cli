@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/pepabo/xpoint-cli/internal/xpoint"
 	"github.com/spf13/cobra"
@@ -93,20 +92,18 @@ func runQueryList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	return render(res, resolveOutputFormat(queryListOutput), queryListJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "GROUP_ID\tGROUP_NAME\tQUERY_ID\tQUERY_CODE\tQUERY_NAME\tQUERY_TYPE\tFORM")
+		w := newTable(os.Stdout,
+			"GROUP_ID", "GROUP_NAME", "QUERY_ID", "QUERY_CODE", "QUERY_NAME", "QUERY_TYPE", "FORM")
 		for _, g := range res.QueryGroups {
 			if len(g.Queries) == 0 {
-				fmt.Fprintf(w, "%d\t%s\t-\t-\t-\t-\t-\n", g.QueryGroupID, g.QueryGroupName)
+				w.AddRow(g.QueryGroupID, g.QueryGroupName, "-", "-", "-", "-", "-")
 				continue
 			}
 			for _, q := range g.Queries {
-				fmt.Fprintf(w, "%d\t%s\t%d\t%s\t%s\t%s\t%s\n",
-					g.QueryGroupID, g.QueryGroupName, q.QueryID, q.QueryCode, q.QueryName, q.QueryType, formatQueryForm(q),
-				)
+				w.AddRow(g.QueryGroupID, g.QueryGroupName, q.QueryID, q.QueryCode, q.QueryName, q.QueryType, formatQueryForm(q))
 			}
 		}
+		w.Print()
 		return nil
 	})
 }

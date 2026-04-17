@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/pepabo/xpoint-cli/internal/xpoint"
@@ -487,15 +486,13 @@ func runDocumentSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	return render(res, resolveOutputFormat(docSearchOutput), docSearchJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
 		fmt.Fprintf(os.Stdout, "total: %d\n", res.TotalCount)
-		fmt.Fprintln(w, "DOCID\tFORM_NAME\tWRITER\tWRITE_DATETIME\tSTEP\tSTAT\tTITLE1")
+		w := newTable(os.Stdout,
+			"DOCID", "FORM_NAME", "WRITER", "WRITE_DATETIME", "STEP", "STAT", "TITLE1")
 		for _, it := range res.Items {
-			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%d\t%d\t%s\n",
-				it.DocID, it.Form.Name, it.Writer, it.WriteDatetime, it.Step, it.Stat, it.Title1,
-			)
+			w.AddRow(it.DocID, it.Form.Name, it.Writer, it.WriteDatetime, it.Step, it.Stat, it.Title1)
 		}
+		w.Print()
 		return nil
 	})
 }
@@ -534,10 +531,9 @@ func runDocumentCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	return render(&view, resolveOutputFormat(docCreateOutput), docCreateJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "DOCID\tMESSAGE_TYPE\tMESSAGE\tURL")
-		fmt.Fprintf(w, "%d\t%d\t%s\t%s\n", view.DocID, view.MessageType, view.Message, view.URL)
+		w := newTable(os.Stdout, "DOCID", "MESSAGE_TYPE", "MESSAGE", "URL")
+		w.AddRow(view.DocID, view.MessageType, view.Message, view.URL)
+		w.Print()
 		return nil
 	})
 }
@@ -586,10 +582,9 @@ func runDocumentEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	return render(res, resolveOutputFormat(docEditOutput), docEditJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "DOCID\tMESSAGE_TYPE\tMESSAGE")
-		fmt.Fprintf(w, "%d\t%d\t%s\n", res.DocID, res.MessageType, res.Message)
+		w := newTable(os.Stdout, "DOCID", "MESSAGE_TYPE", "MESSAGE")
+		w.AddRow(res.DocID, res.MessageType, res.Message)
+		w.Print()
 		return nil
 	})
 }
@@ -615,10 +610,9 @@ func runDocumentDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	return render(res, resolveOutputFormat(docDeleteOutput), docDeleteJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "MESSAGE_TYPE\tMESSAGE")
-		fmt.Fprintf(w, "%d\t%s\n", res.MessageType, res.Message)
+		w := newTable(os.Stdout, "MESSAGE_TYPE", "MESSAGE")
+		w.AddRow(res.MessageType, res.Message)
+		w.Print()
 		return nil
 	})
 }
@@ -916,10 +910,9 @@ func runDocumentCommentAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	return render(res, resolveOutputFormat(docCommentAddOutput), docCommentAddJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "DOCID\tSEQ\tMESSAGE_TYPE\tMESSAGE")
-		fmt.Fprintf(w, "%d\t%d\t%d\t%s\n", res.DocID, res.Seq, res.MessageType, res.Message)
+		w := newTable(os.Stdout, "DOCID", "SEQ", "MESSAGE_TYPE", "MESSAGE")
+		w.AddRow(res.DocID, res.Seq, res.MessageType, res.Message)
+		w.Print()
 		return nil
 	})
 }
@@ -938,16 +931,15 @@ func runDocumentCommentGet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	return render(res, resolveOutputFormat(docCommentGetOutput), docCommentGetJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "SEQ\tATTENTION\tWRITER\tWRITE_DATE\tCONTENT")
+		w := newTable(os.Stdout, "SEQ", "ATTENTION", "WRITER", "WRITE_DATE", "CONTENT")
 		for _, cm := range res.CommentList {
 			attention := "-"
 			if cm.AttentionFlg {
 				attention = "*"
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", cm.SeqNo, attention, cm.WriterName, cm.WriteDate, cm.Content)
+			w.AddRow(cm.SeqNo, attention, cm.WriterName, cm.WriteDate, cm.Content)
 		}
+		w.Print()
 		return nil
 	})
 }
@@ -990,10 +982,9 @@ func runDocumentCommentEdit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	return render(res, resolveOutputFormat(docCommentEditOutput), docCommentEditJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "DOCID\tSEQ\tMESSAGE_TYPE\tMESSAGE")
-		fmt.Fprintf(w, "%d\t%d\t%d\t%s\n", res.DocID, res.Seq, res.MessageType, res.Message)
+		w := newTable(os.Stdout, "DOCID", "SEQ", "MESSAGE_TYPE", "MESSAGE")
+		w.AddRow(res.DocID, res.Seq, res.MessageType, res.Message)
+		w.Print()
 		return nil
 	})
 }
@@ -1019,10 +1010,9 @@ func runDocumentCommentDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	return render(res, resolveOutputFormat(docCommentDeleteOutput), docCommentDeleteJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "DOCID\tSEQ\tMESSAGE_TYPE\tMESSAGE")
-		fmt.Fprintf(w, "%d\t%d\t%d\t%s\n", res.DocID, res.Seq, res.MessageType, res.Message)
+		w := newTable(os.Stdout, "DOCID", "SEQ", "MESSAGE_TYPE", "MESSAGE")
+		w.AddRow(res.DocID, res.Seq, res.MessageType, res.Message)
+		w.Print()
 		return nil
 	})
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/pepabo/xpoint-cli/internal/xpoint"
 	"github.com/spf13/cobra"
@@ -139,16 +138,14 @@ func runApprovalList(cmd *cobra.Command, args []string) error {
 	}
 
 	return render(res, resolveOutputFormat(approvalListOutput), approvalListJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
 		fmt.Fprintf(os.Stdout, "total: %d\n", res.TotalCount)
-		fmt.Fprintln(w, "DOCID\tSTATUS\tFORM_NAME\tAPPLY_USER\tAPPROVERS\tAPPLY_DATETIME\tTITLE1")
+		w := newTable(os.Stdout,
+			"DOCID", "STATUS", "FORM_NAME", "APPLY_USER", "APPROVERS", "APPLY_DATETIME", "TITLE1")
 		for _, a := range res.ApprovalList {
-			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				a.DocID, a.DisplayStatus, a.FormName, a.ApplyUser,
-				strings.Join(a.ApprovalUser, ","), a.ApplyDatetime, a.Title1,
-			)
+			w.AddRow(a.DocID, a.DisplayStatus, a.FormName, a.ApplyUser,
+				strings.Join(a.ApprovalUser, ","), a.ApplyDatetime, a.Title1)
 		}
+		w.Print()
 		return nil
 	})
 }
@@ -179,22 +176,20 @@ func runApprovalWait(cmd *cobra.Command, args []string) error {
 	}
 
 	return render(res, resolveOutputFormat(approvalWaitOutput), approvalWaitJQ, func() error {
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "TYPE\tNAME\tCOUNT")
+		w := newTable(os.Stdout, "TYPE", "NAME", "COUNT")
 		for _, s := range res.StatusList {
-			fmt.Fprintf(w, "%d\t%s\t%d\n", s.Type, s.Name, s.Count)
+			w.AddRow(s.Type, s.Name, s.Count)
 		}
-		w.Flush()
+		w.Print()
 
 		if len(res.WaitList) > 0 {
 			fmt.Fprintln(os.Stdout)
 			fmt.Fprintln(os.Stdout, "最新の承認待ち書類:")
-			w2 := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w2, "DOCID\tFORM_NAME\tWRITER\tWRITE_DATE\tTITLE")
+			w2 := newTable(os.Stdout, "DOCID", "FORM_NAME", "WRITER", "WRITE_DATE", "TITLE")
 			for _, d := range res.WaitList {
-				fmt.Fprintf(w2, "%d\t%s\t%s\t%s\t%s\n", d.DocID, d.Name, d.WriterName, d.WriteDate, d.Title)
+				w2.AddRow(d.DocID, d.Name, d.WriterName, d.WriteDate, d.Title)
 			}
-			w2.Flush()
+			w2.Print()
 		}
 		return nil
 	})
@@ -228,12 +223,11 @@ func runApprovalHidden(cmd *cobra.Command, args []string) error {
 
 	return render(res, resolveOutputFormat(approvalHiddenOutput), approvalHiddenJQ, func() error {
 		fmt.Fprintf(os.Stdout, "message: %s\n", res.Message)
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		defer w.Flush()
-		fmt.Fprintln(w, "DOCID")
+		w := newTable(os.Stdout, "DOCID")
 		for _, id := range res.DocID {
-			fmt.Fprintf(w, "%d\n", id)
+			w.AddRow(id)
 		}
+		w.Print()
 		return nil
 	})
 }
