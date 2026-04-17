@@ -19,71 +19,65 @@ func TestSchemaAliases_Sorted(t *testing.T) {
 }
 
 func TestLookupOperation_Unknown(t *testing.T) {
-	_, err := LookupOperation("nope.missing", false)
+	_, err := LookupOperation("nope.missing")
 	if err == nil || !strings.Contains(err.Error(), "unknown schema alias") {
 		t.Errorf("err = %v", err)
 	}
 }
 
-func TestLookupOperation_FormList_NoResolve(t *testing.T) {
-	op, err := LookupOperation("form.list", false)
+func TestLookupOperation_FormList(t *testing.T) {
+	op, err := LookupOperation("form.list")
 	if err != nil {
 		t.Fatalf("LookupOperation: %v", err)
 	}
-	if op["_method"] != "GET" {
-		t.Errorf("_method = %v", op["_method"])
+	if op["method"] != "GET" {
+		t.Errorf("method = %v", op["method"])
 	}
-	if op["_path"] != "/api/v1/forms" {
-		t.Errorf("_path = %v", op["_path"])
+	if op["path"] != "/api/v1/forms" {
+		t.Errorf("path = %v", op["path"])
 	}
-	if op["operationId"] != "GetAvailableFormList" {
-		t.Errorf("operationId = %v", op["operationId"])
-	}
-	params, ok := op["parameters"].([]any)
-	if !ok || len(params) == 0 {
-		t.Fatalf("parameters = %v", op["parameters"])
-	}
-	// Without --resolve-refs, the first parameter is still a $ref.
-	first, _ := params[0].(map[string]any)
-	if _, hasRef := first["$ref"]; !hasRef {
-		t.Errorf("expected $ref in parameter, got %v", first)
+	// form.id must be integer per our curated schema (upstream spec has a bug).
+	resp, _ := op["response"].(map[string]any)
+	props, _ := resp["properties"].(map[string]any)
+	fg, _ := props["form_group"].(map[string]any)
+	fgItems, _ := fg["items"].(map[string]any)
+	fgProps, _ := fgItems["properties"].(map[string]any)
+	formArr, _ := fgProps["form"].(map[string]any)
+	formItems, _ := formArr["items"].(map[string]any)
+	formProps, _ := formItems["properties"].(map[string]any)
+	formID, _ := formProps["id"].(map[string]any)
+	if formID["type"] != "integer" {
+		t.Errorf("form.id type = %v, want integer", formID["type"])
 	}
 }
 
-func TestLookupOperation_FormList_ResolveRefs(t *testing.T) {
-	op, err := LookupOperation("form.list", true)
+func TestLookupOperation_ApprovalList_RequiredStat(t *testing.T) {
+	op, err := LookupOperation("approval.list")
 	if err != nil {
 		t.Fatalf("LookupOperation: %v", err)
 	}
 	params, _ := op["parameters"].([]any)
 	if len(params) == 0 {
-		t.Fatalf("no parameters")
+		t.Fatal("no parameters")
 	}
 	first, _ := params[0].(map[string]any)
-	if _, hasRef := first["$ref"]; hasRef {
-		t.Errorf("expected $ref to be inlined, got %v", first)
-	}
-	if first["name"] != "fgid" {
-		t.Errorf("first param name = %v", first["name"])
+	if first["name"] != "stat" || first["required"] != true {
+		t.Errorf("first param = %v", first)
 	}
 }
 
 func TestLookupOperation_DocumentSearch(t *testing.T) {
-	op, err := LookupOperation("document.search", false)
+	op, err := LookupOperation("document.search")
 	if err != nil {
 		t.Fatalf("LookupOperation: %v", err)
 	}
-	if op["_method"] != "POST" {
-		t.Errorf("_method = %v", op["_method"])
+	if op["method"] != "POST" {
+		t.Errorf("method = %v", op["method"])
 	}
-	if op["_path"] != "/api/v1/search/documents" {
-		t.Errorf("_path = %v", op["_path"])
+	if op["path"] != "/api/v1/search/documents" {
+		t.Errorf("path = %v", op["path"])
 	}
-}
-
-func TestLookupRef_MissingSegment(t *testing.T) {
-	root := map[string]any{"a": map[string]any{"b": 1}}
-	if _, err := lookupRef(root, "#/a/c"); err == nil {
-		t.Error("expected error for missing segment")
+	if _, ok := op["requestBody"].(map[string]any); !ok {
+		t.Errorf("requestBody missing")
 	}
 }

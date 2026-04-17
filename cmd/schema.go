@@ -10,15 +10,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	schemaResolveRefs bool
-	schemaJQ          string
-)
+var schemaJQ string
 
 var schemaCmd = &cobra.Command{
 	Use:   "schema [service.resource.method]",
-	Short: "Show the OpenAPI schema for an X-point operation",
-	Long: `Print the OpenAPI operation object for a given X-point endpoint.
+	Short: "Show the schema for an X-point operation",
+	Long: `Print the schema object for a given X-point endpoint.
 
 Supported aliases map to the CLI's commands:
   form.list         GET  /api/v1/forms
@@ -32,7 +29,6 @@ Run without arguments to list supported aliases.`,
 
 func init() {
 	rootCmd.AddCommand(schemaCmd)
-	schemaCmd.Flags().BoolVar(&schemaResolveRefs, "resolve-refs", false, "inline $ref pointers into the output")
 	schemaCmd.Flags().StringVar(&schemaJQ, "jq", "", "apply a gojq filter to the schema")
 }
 
@@ -45,7 +41,7 @@ func runSchema(_ *cobra.Command, args []string) error {
 		return nil
 	}
 	alias := strings.TrimSpace(args[0])
-	op, err := xpoint.LookupOperation(alias, schemaResolveRefs)
+	op, err := xpoint.LookupOperation(alias)
 	if err != nil {
 		return err
 	}

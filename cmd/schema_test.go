@@ -21,9 +21,8 @@ func TestSchemaCmd_ListsAliases(t *testing.T) {
 }
 
 func TestSchemaCmd_EmitsJSON(t *testing.T) {
-	schemaResolveRefs = false
 	schemaJQ = ""
-	t.Cleanup(func() { schemaResolveRefs = false; schemaJQ = "" })
+	t.Cleanup(func() { schemaJQ = "" })
 
 	out, err := captureStdout(t, func() error {
 		return runSchema(schemaCmd, []string{"form.list"})
@@ -35,13 +34,12 @@ func TestSchemaCmd_EmitsJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &decoded); err != nil {
 		t.Fatalf("output not JSON: %v (%s)", err, out)
 	}
-	if decoded["_method"] != "GET" || decoded["_path"] != "/api/v1/forms" {
+	if decoded["method"] != "GET" || decoded["path"] != "/api/v1/forms" {
 		t.Errorf("decoded = %v", decoded)
 	}
 }
 
 func TestSchemaCmd_UnknownAlias(t *testing.T) {
-	schemaResolveRefs = false
 	schemaJQ = ""
 	err := runSchema(schemaCmd, []string{"nope"})
 	if err == nil || !strings.Contains(err.Error(), "unknown schema alias") {
@@ -50,8 +48,7 @@ func TestSchemaCmd_UnknownAlias(t *testing.T) {
 }
 
 func TestSchemaCmd_JQFilter(t *testing.T) {
-	schemaResolveRefs = false
-	schemaJQ = ".operationId"
+	schemaJQ = ".summary"
 	t.Cleanup(func() { schemaJQ = "" })
 
 	out, err := captureStdout(t, func() error {
@@ -60,7 +57,7 @@ func TestSchemaCmd_JQFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runSchema: %v", err)
 	}
-	if strings.TrimSpace(out) != `"GetAvailableFormList"` {
+	if strings.TrimSpace(out) != `"利用可能フォーム一覧取得"` {
 		t.Errorf("output = %q", out)
 	}
 }
