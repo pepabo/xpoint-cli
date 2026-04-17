@@ -34,6 +34,7 @@ func TestAliases_Sorted(t *testing.T) {
 		"form.list",
 		"form.show",
 		"query.exec",
+		"query.graph",
 		"query.list",
 	}
 	if len(got) != len(want) {

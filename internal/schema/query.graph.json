@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "path": "/api/v1/query/graph/{query_code}",
+  "summary": "クエリグラフ表示",
+  "description": "認証ユーザが閲覧できるクエリに設定されているグラフ画像を取得する。PNG か JPEG を指定可能 (デフォルト PNG)。",
+  "parameters": [
+    {
+      "name": "query_code",
+      "in": "path",
+      "type": "string",
+      "required": true,
+      "description": "クエリコード"
+    },
+    {
+      "name": "outFormat",
+      "in": "query",
+      "type": "string",
+      "description": "フォーマット: png / jpeg (デフォルト: png)"
+    }
+  ],
+  "response": {
+    "contentType": "image/png | image/jpeg",
+    "description": "グラフ画像 (Content-Disposition でファイル名が返される)"
+  }
+}
