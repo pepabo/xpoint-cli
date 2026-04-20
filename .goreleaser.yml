@@ -31,6 +31,11 @@ builds:
         goarch: amd64
       - goos: windows
         goarch: arm64
+    hooks:
+      post:
+        - cmd: ./scripts/gen-winget-manifest.sh "{{ .Path }}" "{{ .Version }}"
+          env:
+            - TARGET={{ .Os }}_{{ .Arch }}
 
 archives:
   - formats: [binary]
@@ -53,3 +58,5 @@ changelog:
 release:
   draft: false
   prerelease: auto
+  extra_files:
+    - glob: ./dist/winget-manifest.yaml
