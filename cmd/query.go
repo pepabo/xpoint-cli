@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -9,14 +11,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const queryExecPageSize = 1000
+
 var (
 	queryListOutput string
 	queryListJQ     string
 
-	queryExecNoRun  bool
-	queryExecRows   int
-	queryExecOffset int
-	queryExecJQ     string
+	queryExecNoRun bool
+	queryExecJQ    string
 
 	queryGraphFormat string
 	queryGraphOutput string
@@ -40,8 +42,9 @@ var queryExecCmd = &cobra.Command{
 	Long: `Fetch a query and its execution result via GET /api/v1/query/{query_code}.
 
 By default the query is executed (exec_flg=true) and the response contains
-both the definition and exec_result. Pass --no-run to fetch the definition
-only. --rows (default 500) and --offset control pagination for list queries.`,
+both the definition and exec_result. List-type queries are paged through
+automatically (rows=1000) until exec_result.data is exhausted. Pass
+--no-run to fetch the definition only.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runQueryExec,
 }
@@ -73,8 +76,6 @@ func init() {
 
 	ef := queryExecCmd.Flags()
 	ef.BoolVar(&queryExecNoRun, "no-run", false, "do not execute the query; return the definition only (exec_flg=false)")
-	ef.IntVar(&queryExecRows, "rows", 0, "max rows returned by list queries (0 = omit; server default 500; range 1-10000)")
-	ef.IntVar(&queryExecOffset, "offset", 0, "offset for list queries (0 = omit)")
 	ef.StringVar(&queryExecJQ, "jq", "", "apply a gojq filter to the JSON response")
 
 	gf := queryGraphCmd.Flags()
@@ -129,17 +130,13 @@ func runQueryExec(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	p := xpoint.GetQueryParams{ExecFlag: !queryExecNoRun}
-	if cmd.Flags().Changed("rows") {
-		v := queryExecRows
-		p.Rows = &v
-	}
-	if cmd.Flags().Changed("offset") {
-		v := queryExecOffset
-		p.Offset = &v
-	}
 
-	raw, err := client.GetQuery(cmd.Context(), queryCode, p)
+	var raw json.RawMessage
+	if queryExecNoRun {
+		raw, err = client.GetQuery(cmd.Context(), queryCode, xpoint.GetQueryParams{ExecFlag: false})
+	} else {
+		raw, err = fetchAllQueryExec(cmd.Context(), client, queryCode)
+	}
 	if err != nil {
 		return err
 	}
@@ -147,6 +144,87 @@ func runQueryExec(cmd *cobra.Command, args []string) error {
 		return runJQ(raw, queryExecJQ)
 	}
 	return writeJSON(os.Stdout, raw)
+}
+
+// fetchAllQueryExec runs a query with exec_flg=true and pages through
+// exec_result.data (rows=1000) until the server reports an empty or missing
+// data array. For non-list queries whose exec_result does not contain a data
+// array, the first response is returned as-is.
+func fetchAllQueryExec(ctx context.Context, client *xpoint.Client, queryCode string) (json.RawMessage, error) {
+	rows := queryExecPageSize
+	offset := 0
+	p := xpoint.GetQueryParams{ExecFlag: true, Rows: &rows, Offset: &offset}
+
+	var (
+		firstEnv map[string]json.RawMessage
+		allData  []json.RawMessage
+	)
+
+	for {
+		p.Offset = &offset
+		raw, err := client.GetQuery(ctx, queryCode, p)
+		if err != nil {
+			return nil, err
+		}
+		var env map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &env); err != nil {
+			return nil, fmt.Errorf("parse query response: %w", err)
+		}
+		if offset == 0 {
+			firstEnv = env
+		}
+
+		execRaw, ok := env["exec_result"]
+		if !ok {
+			break
+		}
+		var execResult map[string]json.RawMessage
+		if err := json.Unmarshal(execRaw, &execResult); err != nil {
+			break
+		}
+		dataRaw, ok := execResult["data"]
+		if !ok {
+			break
+		}
+		var data []json.RawMessage
+		if err := json.Unmarshal(dataRaw, &data); err != nil {
+			break
+		}
+		if len(data) == 0 {
+			break
+		}
+		allData = append(allData, data...)
+		if len(data) < queryExecPageSize {
+			break
+		}
+		offset += queryExecPageSize
+	}
+
+	if firstEnv == nil {
+		return nil, fmt.Errorf("empty response")
+	}
+	if len(allData) == 0 {
+		return json.Marshal(firstEnv)
+	}
+
+	var execResult map[string]json.RawMessage
+	if raw, ok := firstEnv["exec_result"]; ok {
+		_ = json.Unmarshal(raw, &execResult)
+	}
+	if execResult == nil {
+		execResult = map[string]json.RawMessage{}
+	}
+	encoded, err := json.Marshal(allData)
+	if err != nil {
+		return nil, err
+	}
+	execResult["data"] = encoded
+	mergedExec, err := json.Marshal(execResult)
+	if err != nil {
+		return nil, err
+	}
+	firstEnv["exec_result"] = mergedExec
+	return json.Marshal(firstEnv)
 }
 
 func runQueryGraph(cmd *cobra.Command, args []string) error {
