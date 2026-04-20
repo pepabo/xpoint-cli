@@ -1,5 +1,8 @@
 # Changelog
 
+## [v1.1.1](https://github.com/pepabo/xpoint-cli/compare/v1.1.0...v1.1.1) - 2026-04-20
+- release: リリース成果物に winget manifest を追加 by @buty4649 in https://github.com/pepabo/xpoint-cli/pull/39
+
 ## [v1.1.0](https://github.com/pepabo/xpoint-cli/compare/v1.0.0...v1.1.0) - 2026-04-17
 - goreleaser: アーカイブ名をxp_{version}_{os}_{arch}に変更 by @buty4649 in https://github.com/pepabo/xpoint-cli/pull/16
 - document: PDFダウンロードサブコマンドを追加 by @buty4649 in https://github.com/pepabo/xpoint-cli/pull/18
