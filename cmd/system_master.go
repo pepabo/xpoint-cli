@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,15 +15,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const masterDataPageSize = 1000
+
 var (
 	systemMasterListOutput string
 	systemMasterListJQ     string
 	systemMasterShowOutput string
 	systemMasterShowJQ     string
 
-	systemMasterDataType      int
-	systemMasterDataRows      int
-	systemMasterDataOffset    int
+	systemMasterDataType      string
 	systemMasterDataFormat    string
 	systemMasterDataFileName  string
 	systemMasterDataDelimiter string
@@ -67,8 +69,8 @@ var systemMasterDataCmd = &cobra.Command{
 	Long: `Export master rows via GET /api/v1/system/master/{master_code}/data.
 
 --type (required) selects the master kind:
-  0  simple master
-  1  user-specific master (pass the table_name as <master_code>)
+  simple  simple master
+  user    user-specific master (pass the table_name as <master_code>)
 
 --format defaults to json. Use --format csv for CSV output; the CSV
 payload is written to stdout (or --output FILE / DIR/).`,
@@ -117,16 +119,14 @@ func init() {
 	sf.StringVar(&systemMasterShowJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
 
 	df := systemMasterDataCmd.Flags()
-	df.IntVar(&systemMasterDataType, "type", -1, "master_type: 0=simple master, 1=user-specific master (required)")
-	df.IntVar(&systemMasterDataRows, "rows", 0, "number of rows to fetch (0 = omit; server default 100; max 1000)")
-	df.IntVar(&systemMasterDataOffset, "offset", 0, "offset (0 = omit; server default 0)")
+	df.StringVar(&systemMasterDataType, "type", "", "master type: simple | user (required)")
 	df.StringVar(&systemMasterDataFormat, "format", "json", "output format: json | csv")
 	df.StringVar(&systemMasterDataFileName, "file-name", "", "CSV file name hint (CSV only; default: {master_code}.csv)")
 	df.StringVar(&systemMasterDataDelimiter, "delimiter", "", "CSV delimiter: comma | tab (CSV only; default comma)")
 	df.BoolVar(&systemMasterDataTitle, "title", false, "CSV only (user-specific master): include field names on the first row (default: true)")
 	df.BoolVar(&systemMasterDataNoTitle, "no-title", false, "CSV only (user-specific master): omit field names from the first row")
 	df.StringVar(&systemMasterDataFields, "fields", "", "CSV only (simple master): comma-separated list of field names to include")
-	df.StringVarP(&systemMasterDataOutput, "output", "o", "", "output path: FILE, DIR/, - for stdout (default: stdout for JSON, server-provided filename for CSV)")
+	df.StringVarP(&systemMasterDataOutput, "output", "o", "", "output path: FILE, DIR/, - for stdout (default: stdout)")
 	df.StringVar(&systemMasterDataJQ, "jq", "", "apply a gojq filter to the JSON response (JSON format only)")
 	_ = systemMasterDataCmd.MarkFlagRequired("type")
 
@@ -203,8 +203,14 @@ func runSystemMasterData(cmd *cobra.Command, args []string) error {
 	if masterCode == "" {
 		return fmt.Errorf("master_code is required")
 	}
-	if systemMasterDataType != 0 && systemMasterDataType != 1 {
-		return fmt.Errorf("--type must be 0 (simple) or 1 (user-specific), got %d", systemMasterDataType)
+	var masterType int
+	switch strings.ToLower(strings.TrimSpace(systemMasterDataType)) {
+	case "simple":
+		masterType = 0
+	case "user":
+		masterType = 1
+	default:
+		return fmt.Errorf("--type must be simple or user, got %q", systemMasterDataType)
 	}
 	format := strings.ToLower(strings.TrimSpace(systemMasterDataFormat))
 	switch format {
@@ -218,60 +224,51 @@ func runSystemMasterData(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--title and --no-title are mutually exclusive")
 	}
 
-	p := xpoint.MasterDataParams{MasterType: systemMasterDataType}
-	if cmd.Flags().Changed("rows") {
-		v := systemMasterDataRows
-		p.Rows = &v
-	}
-	if cmd.Flags().Changed("offset") {
-		v := systemMasterDataOffset
-		p.Offset = &v
-	}
-	if format == "csv" {
-		p.FileName = systemMasterDataFileName
-		p.Delimiter = systemMasterDataDelimiter
-		p.Fields = systemMasterDataFields
-		if systemMasterDataNoTitle {
-			b := false
-			p.Title = &b
-		} else if cmd.Flags().Changed("title") {
-			v := systemMasterDataTitle
-			p.Title = &v
-		}
-	}
-
 	client, err := newClientFromFlags(cmd.Context())
-	if err != nil {
-		return err
-	}
-	filename, body, _, err := client.GetMasterData(cmd.Context(), masterCode, format, p)
 	if err != nil {
 		return err
 	}
 
 	if format == "json" {
+		merged, err := fetchAllMasterDataJSON(cmd.Context(), client, masterCode, masterType)
+		if err != nil {
+			return err
+		}
 		if systemMasterDataJQ != "" {
-			return runJQ(json.RawMessage(body), systemMasterDataJQ)
+			return runJQ(json.RawMessage(merged), systemMasterDataJQ)
 		}
 		switch systemMasterDataOutput {
 		case "", "-":
-			_, werr := os.Stdout.Write(body)
+			_, werr := os.Stdout.Write(merged)
 			return werr
 		}
-		dst := resolveDownloadPath(systemMasterDataOutput, fallbackName(filename, masterCode+".json"), 0)
-		if err := os.WriteFile(dst, body, 0o600); err != nil {
+		dst := resolveDownloadPath(systemMasterDataOutput, masterCode+".json", 0)
+		if err := os.WriteFile(dst, merged, 0o600); err != nil {
 			return fmt.Errorf("write master data: %w", err)
 		}
-		fmt.Fprintf(os.Stderr, "saved: %s (%d bytes)\n", dst, len(body))
+		fmt.Fprintf(os.Stderr, "saved: %s (%d bytes)\n", dst, len(merged))
 		return nil
 	}
 
-	// CSV
-	if systemMasterDataOutput == "-" {
-		_, werr := os.Stdout.Write(body)
-		return werr
+	p := xpoint.MasterDataParams{
+		MasterType: masterType,
+		FileName:   systemMasterDataFileName,
+		Delimiter:  systemMasterDataDelimiter,
+		Fields:     systemMasterDataFields,
 	}
-	if systemMasterDataOutput == "" && !isTerminal(os.Stdout) {
+	if systemMasterDataNoTitle {
+		b := false
+		p.Title = &b
+	} else if cmd.Flags().Changed("title") {
+		v := systemMasterDataTitle
+		p.Title = &v
+	}
+	filename, body, err := fetchAllMasterDataCSV(cmd.Context(), client, masterCode, p)
+	if err != nil {
+		return err
+	}
+
+	if systemMasterDataOutput == "" || systemMasterDataOutput == "-" {
 		_, werr := os.Stdout.Write(body)
 		return werr
 	}
@@ -342,6 +339,112 @@ func runSystemMasterUpload(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	return writeJSON(os.Stdout, res)
+}
+
+// fetchAllMasterDataJSON fetches master data as JSON with rows=1000, paging
+// until total_count (or a short/empty page) is reached. The merged JSON keeps
+// the first page's envelope with the concatenated data array.
+func fetchAllMasterDataJSON(ctx context.Context, client *xpoint.Client, masterCode string, masterType int) ([]byte, error) {
+	rows := masterDataPageSize
+	offset := 0
+	p := xpoint.MasterDataParams{MasterType: masterType, Rows: &rows, Offset: &offset}
+
+	var (
+		firstMaster map[string]json.RawMessage
+		allData     []json.RawMessage
+		totalCount  int
+		haveTotal   bool
+	)
+
+	for {
+		p.Offset = &offset
+		_, body, _, err := client.GetMasterData(ctx, masterCode, "json", p)
+		if err != nil {
+			return nil, err
+		}
+		var env struct {
+			Master map[string]json.RawMessage `json:"master"`
+		}
+		if err := json.Unmarshal(body, &env); err != nil {
+			return nil, fmt.Errorf("parse master data: %w", err)
+		}
+
+		if offset == 0 {
+			firstMaster = env.Master
+			if raw, ok := env.Master["total_count"]; ok {
+				if err := json.Unmarshal(raw, &totalCount); err == nil {
+					haveTotal = true
+				}
+			}
+		}
+
+		var data []json.RawMessage
+		if raw, ok := env.Master["data"]; ok {
+			if err := json.Unmarshal(raw, &data); err != nil {
+				return nil, fmt.Errorf("parse master.data: %w", err)
+			}
+		}
+		allData = append(allData, data...)
+
+		if haveTotal && len(allData) >= totalCount {
+			break
+		}
+		if len(data) < masterDataPageSize {
+			break
+		}
+		offset += masterDataPageSize
+	}
+
+	if firstMaster == nil {
+		firstMaster = map[string]json.RawMessage{}
+	}
+	encoded, err := json.Marshal(allData)
+	if err != nil {
+		return nil, err
+	}
+	firstMaster["data"] = encoded
+	return json.Marshal(struct {
+		Master map[string]json.RawMessage `json:"master"`
+	}{Master: firstMaster})
+}
+
+// fetchAllMasterDataCSV fetches master data as CSV with rows=1000, paging
+// until the server returns an empty page. The first page honors the caller's
+// title setting; subsequent pages force title=false so the server omits the
+// header and the bodies can simply be concatenated.
+func fetchAllMasterDataCSV(ctx context.Context, client *xpoint.Client, masterCode string, base xpoint.MasterDataParams) (string, []byte, error) {
+	rows := masterDataPageSize
+	offset := 0
+	p := base
+	p.Rows = &rows
+	p.Offset = &offset
+
+	titleFalse := false
+	var (
+		firstFilename string
+		csvBuf        bytes.Buffer
+	)
+	for {
+		p.Offset = &offset
+		if offset > 0 {
+			p.Title = &titleFalse
+		}
+		filename, body, _, err := client.GetMasterData(ctx, masterCode, "csv", p)
+		if err != nil {
+			return "", nil, err
+		}
+		if offset == 0 {
+			firstFilename = filename
+			csvBuf.Write(body)
+		} else {
+			if len(bytes.TrimSpace(body)) == 0 {
+				break
+			}
+			csvBuf.Write(body)
+		}
+		offset += masterDataPageSize
+	}
+	return firstFilename, csvBuf.Bytes(), nil
 }
 
 // fallbackName returns name when non-empty, else alt.
