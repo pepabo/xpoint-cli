@@ -13,13 +13,44 @@
 
 ## インストール
 
-Go 1.26 以降:
+### Linux / macOS
+
+[gh](https://cli.github.com/) コマンドを使って最新リリースからバイナリを取得:
 
 ```sh
-go install github.com/pepabo/xpoint-cli@latest
+mkdir -p ~/.local/bin
+
+# Linux (amd64)
+gh release download --repo pepabo/xpoint-cli --pattern '*_linux_amd64' -O xp
+chmod +x xp && mv xp ~/.local/bin/
+
+# macOS (arm64)
+gh release download --repo pepabo/xpoint-cli --pattern '*_darwin_arm64' -O xp
+chmod +x xp && xattr -d com.apple.quarantine xp && mv xp ~/.local/bin/
 ```
 
-または [GitHub Releases](https://github.com/pepabo/xpoint-cli/releases) からバイナリを取得。
+[mise](https://mise.jdx.dev/) を使う場合:
+
+```sh
+mise use -g github:pepabo/xpoint-cli@latest
+```
+
+### Windows
+
+PowerShell で最新リリースの `winget-manifest.yaml` をダウンロードし、`winget install --manifest` でインストール:
+
+```powershell
+Invoke-WebRequest -Uri https://github.com/pepabo/xpoint-cli/releases/latest/download/winget-manifest.yaml -OutFile winget-manifest.yaml
+winget install --manifest winget-manifest.yaml
+```
+
+> [!NOTE]
+> `--manifest` を使うには `winget settings` でローカルマニフェストを有効化する必要があります。
+> 管理者権限の PowerShell で `winget settings --enable LocalManifestFiles` を実行してください。
+
+### バイナリを直接ダウンロード
+
+[GitHub Releases](https://github.com/pepabo/xpoint-cli/releases) から対応するバイナリを取得してください。
 
 ## 認証
 
