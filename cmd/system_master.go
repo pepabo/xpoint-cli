@@ -23,7 +23,7 @@ var (
 	systemMasterShowOutput string
 	systemMasterShowJQ     string
 
-	systemMasterDataType      int
+	systemMasterDataType      string
 	systemMasterDataFormat    string
 	systemMasterDataFileName  string
 	systemMasterDataDelimiter string
@@ -69,8 +69,8 @@ var systemMasterDataCmd = &cobra.Command{
 	Long: `Export master rows via GET /api/v1/system/master/{master_code}/data.
 
 --type (required) selects the master kind:
-  0  simple master
-  1  user-specific master (pass the table_name as <master_code>)
+  simple  simple master
+  user    user-specific master (pass the table_name as <master_code>)
 
 --format defaults to json. Use --format csv for CSV output; the CSV
 payload is written to stdout (or --output FILE / DIR/).`,
@@ -119,7 +119,7 @@ func init() {
 	sf.StringVar(&systemMasterShowJQ, "jq", "", "apply a gojq filter to the JSON response (forces JSON output)")
 
 	df := systemMasterDataCmd.Flags()
-	df.IntVar(&systemMasterDataType, "type", -1, "master_type: 0=simple master, 1=user-specific master (required)")
+	df.StringVar(&systemMasterDataType, "type", "", "master type: simple | user (required)")
 	df.StringVar(&systemMasterDataFormat, "format", "json", "output format: json | csv")
 	df.StringVar(&systemMasterDataFileName, "file-name", "", "CSV file name hint (CSV only; default: {master_code}.csv)")
 	df.StringVar(&systemMasterDataDelimiter, "delimiter", "", "CSV delimiter: comma | tab (CSV only; default comma)")
@@ -203,8 +203,14 @@ func runSystemMasterData(cmd *cobra.Command, args []string) error {
 	if masterCode == "" {
 		return fmt.Errorf("master_code is required")
 	}
-	if systemMasterDataType != 0 && systemMasterDataType != 1 {
-		return fmt.Errorf("--type must be 0 (simple) or 1 (user-specific), got %d", systemMasterDataType)
+	var masterType int
+	switch strings.ToLower(strings.TrimSpace(systemMasterDataType)) {
+	case "simple":
+		masterType = 0
+	case "user":
+		masterType = 1
+	default:
+		return fmt.Errorf("--type must be simple or user, got %q", systemMasterDataType)
 	}
 	format := strings.ToLower(strings.TrimSpace(systemMasterDataFormat))
 	switch format {
@@ -224,7 +230,7 @@ func runSystemMasterData(cmd *cobra.Command, args []string) error {
 	}
 
 	if format == "json" {
-		merged, err := fetchAllMasterDataJSON(cmd.Context(), client, masterCode, systemMasterDataType)
+		merged, err := fetchAllMasterDataJSON(cmd.Context(), client, masterCode, masterType)
 		if err != nil {
 			return err
 		}
@@ -245,7 +251,7 @@ func runSystemMasterData(cmd *cobra.Command, args []string) error {
 	}
 
 	p := xpoint.MasterDataParams{
-		MasterType: systemMasterDataType,
+		MasterType: masterType,
 		FileName:   systemMasterDataFileName,
 		Delimiter:  systemMasterDataDelimiter,
 		Fields:     systemMasterDataFields,
