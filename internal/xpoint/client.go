@@ -163,7 +163,7 @@ type SystemForm struct {
 }
 
 type SystemFormGroup struct {
-	ID        string       `json:"id"`
+	ID        int          `json:"id"`
 	Name      string       `json:"name"`
 	FormCount int          `json:"form_count"`
 	Form      []SystemForm `json:"form"`
