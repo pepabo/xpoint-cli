@@ -1,5 +1,9 @@
 # Changelog
 
+## [v1.1.3](https://github.com/pepabo/xpoint-cli/compare/v1.1.2...v1.1.3) - 2026-04-21
+- query: exec を全件取得へ変更し --rows / --offset を撤廃 by @buty4649 in https://github.com/pepabo/xpoint-cli/pull/43
+- fix: SystemFormGroup.ID を int に変更 by @buty4649 in https://github.com/pepabo/xpoint-cli/pull/45
+
 ## [v1.1.2](https://github.com/pepabo/xpoint-cli/compare/v1.1.1...v1.1.2) - 2026-04-20
 - system: master data を全件取得へ変更 by @buty4649 in https://github.com/pepabo/xpoint-cli/pull/41
 
