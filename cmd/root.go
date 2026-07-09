@@ -17,7 +17,7 @@ var (
 	flagAPIAccessToken  string
 )
 
-var version = "1.1.2"
+var version = "1.1.3"
 
 var rootCmd = &cobra.Command{
 	Use:          "xp",
