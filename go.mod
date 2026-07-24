@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/itchyny/gojq v0.12.19
-	github.com/mattn/go-runewidth v0.0.24
+	github.com/mattn/go-runewidth v0.0.27
 	github.com/spf13/cobra v1.10.2
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/term v0.45.0
