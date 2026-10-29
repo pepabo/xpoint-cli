@@ -2,6 +2,8 @@ module github.com/pepabo/xpoint-cli
 
 go 1.26.1
 
+toolchain go1.27.3
+
 require (
 	github.com/itchyny/gojq v0.12.19
 	github.com/mattn/go-runewidth v0.0.31
