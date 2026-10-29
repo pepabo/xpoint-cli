@@ -380,8 +380,8 @@ func parseTristateBool(flag, s string) (*bool, error) {
 
 func parseAttachSeq(s string) (int, error) {
 	n, err := strconv.Atoi(strings.TrimSpace(s))
-	if err != nil || n <= 0 {
-		return 0, fmt.Errorf("invalid attach seq %q: must be a positive integer", s)
+	if err != nil || n < 0 {
+		return 0, fmt.Errorf("invalid attach seq %q: must be a non-negative integer", s)
 	}
 	return n, nil
 }

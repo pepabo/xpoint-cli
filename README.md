@@ -196,6 +196,8 @@ xp document attachment delete 266248 1 --user u001               # 削除（確�
 xp document attachment delete 266248 1 --user u001 -y            # 確認なしで削除
 ```
 
+`get` / `update` / `delete` の添付番号には、`attachment list` が返す `seq` をそのまま指定します。`seq` は `0` のこともあります。
+
 ### ドキュメントのPDFダウンロード
 
 ```sh
